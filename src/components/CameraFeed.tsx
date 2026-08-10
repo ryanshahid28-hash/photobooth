@@ -282,8 +282,8 @@ export default function CameraFeed({
   };
 
   return (
-    <div className="min-h-screen w-full bg-neutral-950 text-white p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto selection:bg-orange-500/30">
-      {/* Top Header & Layout Selector */}
+    <div className="min-h-screen w-full bg-zinc-900 text-white p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto selection:bg-orange-500/30">
+      {/* Top Header */}
       <header className="w-full flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -295,7 +295,7 @@ export default function CameraFeed({
                 Web Photobooth
               </h1>
               <p className="text-xs text-neutral-400 hidden sm:block">
-                Select a layout, set the timer, and snap your photos.
+                Set the timer and snap your photos.
               </p>
             </div>
           </div>
@@ -306,15 +306,6 @@ export default function CameraFeed({
             </span>
           </div>
         </div>
-
-        {/* Wireframe Layout Selector */}
-        {!isComplete && (
-          <LayoutSelector
-            selectedLayout={selectedLayout}
-            onSelectLayout={handleLayoutChange}
-            disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-          />
-        )}
       </header>
 
       {/* Main Viewport Section */}
