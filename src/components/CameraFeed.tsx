@@ -383,7 +383,7 @@ export default function CameraFeed({
         {/* CAMERA VIEWPORT CONTAINER */}
         <div
           ref={containerRef}
-          className="relative w-full max-w-3xl aspect-[4/3] bg-black overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
+          className="relative w-full max-w-3xl aspect-[4/3] bg-neutral-800 overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
         >
           {/* White Flash Effect Overlay */}
           <div

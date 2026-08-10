@@ -117,11 +117,6 @@ export default function PrinterPreview({
     ctx.lineTo(canvasWidth - padding, footerY + 15);
     ctx.stroke();
 
-    ctx.fillStyle = "#111827";
-    ctx.font = "bold 26px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Your Shop Logo Here", canvasWidth / 2, footerY + 60);
-
     const now = new Date();
     const formattedDate =
       now.toLocaleDateString("en-US", {

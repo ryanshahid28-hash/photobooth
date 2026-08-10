@@ -72,30 +72,6 @@ export default function PhotoboothStateMachine() {
 
   return (
     <div className="relative min-h-screen w-full bg-[#e2e8f0] text-white flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-orange-500/30">
-      {/* Background Ambient Logos */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute top-[6%] left-[4%] w-48 md:w-60 opacity-15 blur-[4px] -rotate-12 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute top-[12%] right-[6%] w-64 md:w-80 opacity-20 blur-[6px] rotate-45 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute bottom-[10%] left-[8%] w-56 md:w-72 opacity-10 blur-[8px] -rotate-45 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute bottom-[18%] right-[10%] w-52 md:w-64 opacity-15 blur-[3px] rotate-12 select-none"
-        />
-      </div>
-
       {/* Main Container Layer */}
       <div className="relative z-10 w-full max-w-4xl flex flex-col items-center justify-center min-h-[85vh] p-4 sm:p-6 md:p-12 rounded-3xl bg-neutral-950/65 border border-white/20 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)]">
         {/* Step Indicator Header */}
