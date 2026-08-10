@@ -15,6 +15,9 @@ import {
   Maximize2,
   Minimize2,
   Loader2,
+  Share2,
+  Film,
+  FileImage,
 } from "lucide-react";
 
 export type PhotoboothStep = "start" | "layout" | "camera";
@@ -72,6 +75,7 @@ export default function PhotoboothStateMachine() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   const targetPoses = selectedLayout?.poseCount || 3;
 
@@ -317,7 +321,7 @@ export default function PhotoboothStateMachine() {
     }
   }, [isReviewState, drawPhotoStrip]);
 
-  // Download Photo Strip Function (DONE button action)
+  // Download Photo Strip Function (Download PNG button action)
   const handleDownload = async () => {
     try {
       setIsGenerating(true);
@@ -336,6 +340,33 @@ export default function PhotoboothStateMachine() {
       console.error("Failed to download photo strip:", err);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Share Handler
+  const handleShare = async () => {
+    try {
+      const canvas = await drawPhotoStrip();
+      if (!canvas) return;
+
+      const dataUrl = canvas.toDataURL("image/png");
+
+      if (navigator.share) {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "photobooth-strip.png", { type: "image/png" });
+        await navigator.share({
+          title: "My Photobooth Memory",
+          text: "Check out my photo strip!",
+          files: [file],
+        });
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setShareFeedback("Link copied to clipboard!");
+        setTimeout(() => setShareFeedback(null), 3000);
+      }
+    } catch (err) {
+      console.warn("Share operation cancelled or unsupported:", err);
     }
   };
 
@@ -464,208 +495,246 @@ export default function PhotoboothStateMachine() {
               </div>
             </div>
 
-            {/* TOP CONTROL BAR (Above Video Feed) */}
-            <div className="w-full flex items-center justify-center gap-3 sm:gap-4 mb-4 flex-wrap z-10">
-              {/* Camera Device Select */}
-              <select
-                value={selectedDeviceId || facingMode}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "user" || val === "environment") {
-                    setSelectedDeviceId("");
-                    setFacingMode(val as "user" | "environment");
-                  } else {
-                    setSelectedDeviceId(val);
-                  }
-                }}
-                disabled={isCapturing}
-                className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {devices.length > 0 ? (
-                  devices.map((device, idx) => (
-                    <option key={device.deviceId || idx} value={device.deviceId}>
-                      {device.label || `Camera ${idx + 1}`}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="user">User Facing</option>
-                    <option value="environment">Rear Facing</option>
-                  </>
-                )}
-              </select>
-
-              {/* Upload Image Button */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isCapturing}
-                className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <UploadCloud className="w-4 h-4 text-slate-700" />
-                <span>Upload Image</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-
-              {/* Timer Select */}
-              <select
-                value={timerDuration}
-                onChange={(e) => setTimerDuration(Number(e.target.value))}
-                disabled={isCapturing}
-                className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value={3}>3s</option>
-                <option value={5}>5s</option>
-                <option value={10}>10s</option>
-              </select>
-            </div>
-
-            {/* RELATIVE VIEWPORT CONTAINER */}
-            <div
-              ref={videoContainerRef}
-              className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-neutral-900 border border-white/10 mb-4 group"
-            >
-              {/* STATE TRIGGER: In Review State -> Unmount/Hide live <Webcam/> feed and render Photo Strip Preview */}
-              {isReviewState ? (
-                <div className="relative w-full h-full flex flex-col items-center justify-center p-3 bg-neutral-900 overflow-y-auto">
-                  {previewDataUrl ? (
-                    <div className="relative max-h-full flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
-                      <img
-                        src={previewDataUrl}
-                        alt="Photo Strip Preview"
-                        className="max-h-[70vh] object-contain rounded-xl shadow-2xl border border-white/20"
-                      />
-                      <div className="mt-1.5 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-400 text-[11px] font-semibold">
-                        Photo Strip Review Preview
-                      </div>
-                    </div>
+            {/* TOP CONTROL BAR (Visible during live feed) */}
+            {!isReviewState && (
+              <div className="w-full flex items-center justify-center gap-3 sm:gap-4 mb-4 flex-wrap z-10">
+                <select
+                  value={selectedDeviceId || facingMode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "user" || val === "environment") {
+                      setSelectedDeviceId("");
+                      setFacingMode(val as "user" | "environment");
+                    } else {
+                      setSelectedDeviceId(val);
+                    }
+                  }}
+                  disabled={isCapturing}
+                  className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {devices.length > 0 ? (
+                    devices.map((device, idx) => (
+                      <option key={device.deviceId || idx} value={device.deviceId}>
+                        {device.label || `Camera ${idx + 1}`}
+                      </option>
+                    ))
                   ) : (
-                    <div className="flex flex-col items-center justify-center text-white gap-2">
+                    <>
+                      <option value="user">User Facing</option>
+                      <option value="environment">Rear Facing</option>
+                    </>
+                  )}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isCapturing}
+                  className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <UploadCloud className="w-4 h-4 text-slate-700" />
+                  <span>Upload Image</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+
+                <select
+                  value={timerDuration}
+                  onChange={(e) => setTimerDuration(Number(e.target.value))}
+                  disabled={isCapturing}
+                  className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value={3}>3s</option>
+                  <option value={5}>5s</option>
+                  <option value={10}>10s</option>
+                </select>
+              </div>
+            )}
+
+            {/* REVIEW STATE: PRINTER HARDWARE & AESTHETIC EXIT SLOT DESIGN */}
+            {isReviewState ? (
+              <div className="w-full max-w-md mx-auto flex flex-col items-center animate-in fade-in zoom-in-95 duration-300 my-4">
+                {/* PRINTER HARDWARE (TOP CONTAINER) */}
+                <div className="w-full bg-zinc-800 rounded-3xl p-4 sm:p-5 relative shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-3px_6px_rgba(0,0,0,0.6)] border border-zinc-700/50 z-20">
+                  <div className="flex items-center justify-between px-2">
+                    {/* Left: White italic text 'Ready ✦' */}
+                    <span className="text-white font-serif italic text-sm sm:text-base tracking-wide flex items-center gap-1.5">
+                      Ready ✦
+                    </span>
+
+                    {/* Right: Small glowing yellow dot */}
+                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]" />
+                  </div>
+
+                  {/* Exit Slot: Horizontal dark div at bottom of printer hardware */}
+                  <div className="w-full h-2.5 bg-zinc-950 rounded-full border border-black/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] mt-4 overflow-hidden" />
+                </div>
+
+                {/* THE PHOTO STRIP WRAPPER (Tucked behind printer slot using negative margin & z-10) */}
+                <div className="relative z-10 -mt-2 bg-amber-950/80 p-3 sm:p-4 rounded-b-2xl shadow-2xl border border-amber-900/40 flex flex-col items-center justify-center max-w-sm w-full transition-all">
+                  {previewDataUrl ? (
+                    <img
+                      src={previewDataUrl}
+                      alt="Printed Photo Strip"
+                      className="max-h-[55vh] object-contain rounded-lg shadow-xl border border-white/20 animate-in fade-in slide-in-from-top-4 duration-500"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-white py-12 gap-2">
                       <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-                      <p className="text-xs font-semibold">Generating Preview...</p>
+                      <p className="text-xs font-semibold">Printing Photo Strip...</p>
                     </div>
                   )}
                 </div>
-              ) : (
-                /* Live Camera Feed & Overlays */
-                <>
-                  <Webcam
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={
-                      selectedDeviceId
-                        ? { deviceId: selectedDeviceId, aspectRatio: 3 / 4 }
-                        : { facingMode, aspectRatio: 3 / 4 }
-                    }
-                    onUserMedia={handleUserMedia}
-                    mirrored={isMirrored}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                    }}
-                  />
 
-                  {/* Flash Overlay Effect */}
-                  {flash && (
-                    <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-200 pointer-events-none" />
-                  )}
+                {/* TYPOGRAPHY BELOW PHOTO STRIP */}
+                <div className="mt-6 text-center">
+                  <p className="font-serif italic text-orange-500 text-sm sm:text-base tracking-wide mb-1">
+                    a moment, kept ✦
+                  </p>
+                  <h2 className="font-serif italic text-orange-500 text-2xl sm:text-3xl font-bold tracking-tight">
+                    Ready to share ✦
+                  </h2>
+                </div>
 
-                  {/* Countdown Overlay on Center of Feed */}
-                  {isCapturing && countdown !== null && countdown > 0 && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] z-30 pointer-events-none">
-                      <div className="text-8xl md:text-9xl font-black text-white drop-shadow-[0_4px_25px_rgba(249,115,22,0.9)] animate-pulse tracking-tight">
-                        {countdown}
-                      </div>
-                      <div className="text-sm font-semibold tracking-wider text-orange-400 uppercase mt-3 px-4 py-1 rounded-full bg-black/60 border border-orange-500/50">
-                        Pose {capturedImages.length + 1} of {targetPoses}
-                      </div>
-                    </div>
-                  )}
+                {/* ACTION BUTTONS (VERTICAL FLEX STACK) */}
+                <div className="flex flex-col gap-3 w-full max-w-xs sm:max-w-sm mx-auto mt-6">
+                  {/* 1. Download PNG: Solid orange fill */}
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={isGenerating}
+                    className="bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all w-full text-base disabled:opacity-50"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-white" />
+                    ) : (
+                      <Download className="w-5 h-5 text-white" />
+                    )}
+                    <span>Download PNG</span>
+                  </button>
 
-                  {/* Live Pose Counter Badge */}
-                  <div className="absolute top-4 left-4 z-20 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isCapturing ? "bg-orange-500 animate-ping" : "bg-emerald-400"}`} />
-                    <span>Poses: {capturedImages.length} / {targetPoses}</span>
+                  {/* 2. Save GIF & Save Video: Side-by-side flex row */}
+                  <div className="flex items-center gap-3 w-full">
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
+                    >
+                      <FileImage className="w-4 h-4 text-orange-500" />
+                      <span>Save GIF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
+                    >
+                      <Film className="w-4 h-4 text-orange-500" />
+                      <span>Save Video</span>
+                    </button>
                   </div>
-                </>
-              )}
 
-              {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                title="Toggle Fullscreen"
-                className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="w-4 h-4 text-slate-800" />
-                ) : (
-                  <Maximize2 className="w-4 h-4 text-slate-800" />
-                )}
-                <span>Fullscreen</span>
-              </button>
-            </div>
+                  {/* 3. Share: Full width, dark gray fill */}
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="bg-zinc-900 hover:bg-zinc-800 active:scale-98 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md border border-white/10 flex items-center justify-center gap-2 cursor-pointer transition-all w-full text-sm sm:text-base"
+                  >
+                    <Share2 className="w-4 h-4 text-white" />
+                    <span>Share</span>
+                  </button>
 
-            {/* BOTTOM CONTROL BAR */}
-            {isReviewState ? (
-              /* CONTROL BAR SWAP: REVIEW STATE BUTTONS */
-              <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap animate-in fade-in slide-in-from-bottom-2 duration-300">
-                {/* Mirror: Outlined style (border border-orange-500 text-orange-500) */}
-                <button
-                  type="button"
-                  onClick={() => setIsMirrored((prev) => !prev)}
-                  className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide active:scale-95"
-                >
-                  <span>Mirror: {isMirrored ? "On" : "Off"}</span>
-                </button>
-
-                {/* Retake: Solid fill (bg-orange-500 text-white, resets capturedImages to [] and returns to live feed) */}
-                <button
-                  type="button"
-                  onClick={handleRetake}
-                  className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide flex items-center gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Retake</span>
-                </button>
-
-                {/* DONE: Outlined style (border border-orange-500 text-orange-500, hooked to canvas download) */}
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  disabled={isGenerating}
-                  className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4" />
+                  {shareFeedback && (
+                    <p className="text-xs text-orange-400 text-center font-semibold animate-pulse">
+                      {shareFeedback}
+                    </p>
                   )}
-                  <span>DONE</span>
-                </button>
 
-                {/* Flash: Solid fill (bg-orange-500 text-white) */}
-                <button
-                  type="button"
-                  onClick={() => setIsFlashOn((prev) => !prev)}
-                  className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide"
-                >
-                  <span>Flash: {isFlashOn ? "On" : "Off"}</span>
-                </button>
+                  {/* Retake Session Option */}
+                  <button
+                    type="button"
+                    onClick={handleRetake}
+                    className="mt-2 text-xs font-semibold text-neutral-400 hover:text-white flex items-center justify-center gap-1.5 py-1.5 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Take new photos</span>
+                  </button>
+                </div>
               </div>
             ) : (
-              /* STANDARD LIVE CAMERA CONTROL BAR */
+              /* LIVE VIEWPORT CONTAINER */
+              <div
+                ref={videoContainerRef}
+                className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-neutral-900 border border-white/10 mb-4 group"
+              >
+                <Webcam
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  videoConstraints={
+                    selectedDeviceId
+                      ? { deviceId: selectedDeviceId, aspectRatio: 3 / 4 }
+                      : { facingMode, aspectRatio: 3 / 4 }
+                  }
+                  onUserMedia={handleUserMedia}
+                  mirrored={isMirrored}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                  }}
+                />
+
+                {/* Flash Overlay Effect */}
+                {flash && (
+                  <div className="absolute inset-0 bg-white z-50 animate-out fade-out duration-200 pointer-events-none" />
+                )}
+
+                {/* Countdown Overlay on Center of Feed */}
+                {isCapturing && countdown !== null && countdown > 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] z-30 pointer-events-none">
+                    <div className="text-8xl md:text-9xl font-black text-white drop-shadow-[0_4px_25px_rgba(249,115,22,0.9)] animate-pulse tracking-tight">
+                      {countdown}
+                    </div>
+                    <div className="text-sm font-semibold tracking-wider text-orange-400 uppercase mt-3 px-4 py-1 rounded-full bg-black/60 border border-orange-500/50">
+                      Pose {capturedImages.length + 1} of {targetPoses}
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Pose Counter Badge */}
+                <div className="absolute top-4 left-4 z-20 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isCapturing ? "bg-orange-500 animate-ping" : "bg-emerald-400"}`} />
+                  <span>Poses: {capturedImages.length} / {targetPoses}</span>
+                </div>
+
+                {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  title="Toggle Fullscreen"
+                  className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="w-4 h-4 text-slate-800" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4 text-slate-800" />
+                  )}
+                  <span>Fullscreen</span>
+                </button>
+              </div>
+            )}
+
+            {/* STANDARD LIVE CAMERA CONTROL BAR */}
+            {!isReviewState && (
               <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
                 <button
                   type="button"
@@ -704,46 +773,43 @@ export default function PhotoboothStateMachine() {
               </div>
             )}
 
-            {/* Thumbnail Previews Row */}
-            <div className="w-full max-w-2xl bg-neutral-900/60 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
-              <div className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-3 flex items-center justify-between">
-                <span>Captured Poses ({capturedImages.length}/{targetPoses})</span>
-                {isReviewState && (
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4" /> Ready to Download!
-                  </span>
-                )}
-              </div>
+            {/* Thumbnail Previews Row (Only during live mode) */}
+            {!isReviewState && (
+              <div className="w-full max-w-2xl bg-neutral-900/60 border border-white/10 rounded-2xl p-4 backdrop-blur-md">
+                <div className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-3 flex items-center justify-between">
+                  <span>Captured Poses ({capturedImages.length}/{targetPoses})</span>
+                </div>
 
-              <div className="grid grid-cols-4 gap-3">
-                {Array.from({ length: targetPoses }).map((_, idx) => {
-                  const img = capturedImages[idx];
-                  return (
-                    <div
-                      key={idx}
-                      className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
-                        img
-                          ? "border-orange-500 shadow-md shadow-orange-500/20 bg-black"
-                          : "border-white/10 bg-black/40 border-dashed"
-                      }`}
-                    >
-                      {img ? (
-                        <img
-                          src={img}
-                          alt={`Pose ${idx + 1}`}
-                          className="w-full h-full object-cover animate-in fade-in zoom-in-95 duration-200"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-neutral-600 gap-1">
-                          <ImageIcon className="w-4 h-4 text-neutral-600" />
-                          <span className="text-[10px] font-bold">Pose {idx + 1}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                <div className="grid grid-cols-4 gap-3">
+                  {Array.from({ length: targetPoses }).map((_, idx) => {
+                    const img = capturedImages[idx];
+                    return (
+                      <div
+                        key={idx}
+                        className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
+                          img
+                            ? "border-orange-500 shadow-md shadow-orange-500/20 bg-black"
+                            : "border-white/10 bg-black/40 border-dashed"
+                        }`}
+                      >
+                        {img ? (
+                          <img
+                            src={img}
+                            alt={`Pose ${idx + 1}`}
+                            className="w-full h-full object-cover animate-in fade-in zoom-in-95 duration-200"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-neutral-600 gap-1">
+                            <ImageIcon className="w-4 h-4 text-neutral-600" />
+                            <span className="text-[10px] font-bold">Pose {idx + 1}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
