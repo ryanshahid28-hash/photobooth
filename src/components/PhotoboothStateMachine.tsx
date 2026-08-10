@@ -461,7 +461,7 @@ export default function PhotoboothStateMachine() {
             </div>
 
             {/* Controls Row */}
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex flex-wrap justify-center items-center gap-3 px-4 w-full mb-6">
               {/* Conditional Button: Start Capture vs Download Photo Strip */}
               {capturedImages.length < targetPoses ? (
                 <button
