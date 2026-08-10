@@ -220,6 +220,7 @@ export default function CameraFeed({
     runPoseCountdown(0);
   };
 
+  // State Logic: When countdown hits zero, capture photo and pause for 1.5 seconds
   const runPoseCountdown = (poseIndex: number) => {
     setCurrentPoseIndex(poseIndex);
     let timeLeft = timerDuration;
@@ -239,6 +240,7 @@ export default function CameraFeed({
 
         const nextPose = poseIndex + 1;
         if (nextPose < selectedLayout.poseCount) {
+          // Pause next countdown from starting for 1.5 seconds
           setSessionStatus("capturing");
           activeTimeoutRef.current = setTimeout(() => {
             setSessionStatus("countdown");
@@ -265,7 +267,7 @@ export default function CameraFeed({
     setIsFlashing(false);
   };
 
-  // DONE Button Handler: Triggers parent state change (setCurrentStep('preview')) to unmount camera & mount printer preview page
+  // DONE Button Handler: Triggers parent state change (setCurrentStep('preview'))
   const handleDone = () => {
     const images = capturedPhotos.map((p) => p.dataUrl);
     if (onComplete) {
@@ -449,12 +451,11 @@ export default function CameraFeed({
             </div>
           )}
 
-          {/* Pause Between Poses Overlay */}
+          {/* 1.5s Pause & Notify Overlay between poses */}
           {sessionStatus === "capturing" && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
-              <div className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                <span>Pose #{currentPoseIndex + 1} Captured! Next coming up...</span>
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+              <div className="absolute z-10 text-3xl font-serif italic text-gray-200 drop-shadow-lg text-center">
+                Captured...
               </div>
             </div>
           )}
@@ -485,7 +486,7 @@ export default function CameraFeed({
 
         {/* CONDITIONAL BOTTOM CONTROL BAR */}
         {isComplete ? (
-          /* AFTER CAPTURE (isComplete): Hides initial 3 buttons and renders 4 review buttons */
+          /* AFTER CAPTURE (isComplete): Render 4 review buttons */
           <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap overflow-x-auto py-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
             {/* 1. Mirror: Off (White background, gray border/text) */}
             <button
@@ -496,7 +497,7 @@ export default function CameraFeed({
               <span>Mirror: {isMirrored ? "On" : "Off"}</span>
             </button>
 
-            {/* 2. Retake (Solid bg-orange-500, white text) -> Wired to setCapturedPhotos([]) / reset session */}
+            {/* 2. Retake (Solid bg-orange-500, white text) */}
             <button
               type="button"
               onClick={handleRetake}
@@ -506,7 +507,7 @@ export default function CameraFeed({
               <span>Retake</span>
             </button>
 
-            {/* 3. DONE (White background, border-orange-500 border, text-orange-500 text) -> Triggers parent state change setCurrentStep('preview') */}
+            {/* 3. DONE (White background, border-orange-500, text-orange-500) */}
             <button
               type="button"
               onClick={handleDone}
@@ -526,7 +527,7 @@ export default function CameraFeed({
             </button>
           </div>
         ) : (
-          /* BEFORE CAPTURE (!isComplete): Render 3 initial solid orange buttons (Mirror, START, Flash) */
+          /* BEFORE CAPTURE (!isComplete): Render 3 initial solid orange buttons */
           <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
             <button
               type="button"
