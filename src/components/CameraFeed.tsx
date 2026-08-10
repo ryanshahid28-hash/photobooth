@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Webcam from "react-webcam";
-import { motion } from "framer-motion";
 import LayoutSelector from "@/components/LayoutSelector";
 import {
   FacingMode,
@@ -24,25 +23,39 @@ import {
   UploadCloud,
   Maximize2,
   Minimize2,
-  Download,
-  Share2,
-  Film,
-  FileImage,
 } from "lucide-react";
 
-export default function CameraFeed() {
+export interface CameraFeedProps {
+  selectedLayout?: PhotoboothLayout;
+  onSelectLayout?: (layout: PhotoboothLayout) => void;
+  onComplete?: (images: string[]) => void;
+  onBack?: () => void;
+}
+
+export default function CameraFeed({
+  selectedLayout: propLayout,
+  onSelectLayout: propOnSelectLayout,
+  onComplete,
+  onBack,
+}: CameraFeedProps = {}) {
   // State Manager
   const [selectedLayout, setSelectedLayout] = useState<PhotoboothLayout>(
-    LAYOUT_OPTIONS[0]
+    propLayout || LAYOUT_OPTIONS[0]
   );
   const [facingMode, setFacingMode] = useState<FacingMode>("user");
   const [timerDuration, setTimerDuration] = useState<TimerDuration>(3);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
 
+  useEffect(() => {
+    if (propLayout) {
+      setSelectedLayout(propLayout);
+    }
+  }, [propLayout]);
+
   // Controls States
   const [isMirrored, setIsMirrored] = useState<boolean>(false);
-  const [isFlashOn, setIsFlashOn] = useState<boolean>(false);
+  const [isFlashOn, setIsFlashOn] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
@@ -55,12 +68,6 @@ export default function CameraFeed() {
   const [currentPoseIndex, setCurrentPoseIndex] = useState<number>(0);
   const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
-  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState<boolean>(false);
-  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-
-  // Printing animation state: true during mechanical rollout (2.5s)
-  const [isPrinting, setIsPrinting] = useState<boolean>(true);
 
   const webcamRef = useRef<Webcam>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,23 +76,10 @@ export default function CameraFeed() {
   const activeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Review state check: true when all poses are captured
-  const isReviewState =
+  // State Check: Evaluate if capture is complete
+  const isComplete =
     capturedPhotos.length > 0 &&
     capturedPhotos.length === selectedLayout.poseCount;
-
-  // Handle printing timer feedback state
-  useEffect(() => {
-    if (isReviewState) {
-      setIsPrinting(true);
-      const timer = setTimeout(() => {
-        setIsPrinting(false);
-      }, 2500);
-      return () => clearTimeout(timer);
-    } else {
-      setIsPrinting(true);
-    }
-  }, [isReviewState]);
 
   // Stable Memoized Video Constraints
   const videoConstraints = useMemo<MediaTrackConstraints>(() => {
@@ -141,122 +135,6 @@ export default function CameraFeed() {
     }
     setErrorMessage(msg);
   }, []);
-
-  // Generate Photo Strip Composited Image for Printer Slot Preview & Download
-  const generatePhotoStripCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
-    if (capturedPhotos.length === 0) return null;
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    const poseCount = capturedPhotos.length;
-    const canvasWidth = 600;
-    const padding = 24;
-    const photoWidth = canvasWidth - padding * 2;
-    const targetAspectRatio = 3 / 4;
-    const photoHeight = Math.round(photoWidth / targetAspectRatio);
-    const footerHeight = 130;
-    const canvasHeight = padding + poseCount * (photoHeight + padding) + footerHeight;
-
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    const loadImage = (src: string): Promise<HTMLImageElement> => {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = (err) => reject(err);
-        img.src = src;
-      });
-    };
-
-    for (let i = 0; i < poseCount; i++) {
-      try {
-        const img = await loadImage(capturedPhotos[i].dataUrl);
-        const x = padding;
-        const y = padding + i * (photoHeight + padding);
-
-        const imgWidth = img.naturalWidth || img.width;
-        const imgHeight = img.naturalHeight || img.height;
-        const imgAspect = imgWidth / imgHeight;
-
-        let sx = 0;
-        let sy = 0;
-        let sWidth = imgWidth;
-        let sHeight = imgHeight;
-
-        if (imgAspect > targetAspectRatio) {
-          sWidth = imgHeight * targetAspectRatio;
-          sHeight = imgHeight;
-          sx = (imgWidth - sWidth) / 2;
-          sy = 0;
-        } else if (imgAspect < targetAspectRatio) {
-          sWidth = imgWidth;
-          sHeight = imgWidth / targetAspectRatio;
-          sx = 0;
-          sy = (imgHeight - sHeight) / 2;
-        }
-
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWidth, photoHeight);
-
-        ctx.strokeStyle = "#E5E5E5";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, photoWidth, photoHeight);
-      } catch (err) {
-        console.error("Error drawing photo onto canvas:", err);
-      }
-    }
-
-    const footerY = canvasHeight - footerHeight;
-
-    ctx.strokeStyle = "#F97316";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(padding, footerY + 15);
-    ctx.lineTo(canvasWidth - padding, footerY + 15);
-    ctx.stroke();
-
-    ctx.fillStyle = "#111827";
-    ctx.font = "bold 26px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Your Shop Logo Here", canvasWidth / 2, footerY + 60);
-
-    const now = new Date();
-    const formattedDate =
-      now.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }) +
-      " • " +
-      now.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-    ctx.fillStyle = "#6B7280";
-    ctx.font = "14px sans-serif";
-    ctx.fillText(`PHOTOBOOTH MEMORY • ${formattedDate}`, canvasWidth / 2, footerY + 90);
-
-    return canvas;
-  }, [capturedPhotos]);
-
-  // Update preview image data URL whenever capturedPhotos changes to review state
-  useEffect(() => {
-    if (isReviewState) {
-      generatePhotoStripCanvas().then((canvas) => {
-        if (canvas) {
-          setPreviewDataUrl(canvas.toDataURL("image/png"));
-        }
-      });
-    } else {
-      setPreviewDataUrl(null);
-    }
-  }, [isReviewState, generatePhotoStripCanvas]);
 
   // Fullscreen Toggle Handler
   const toggleFullscreen = () => {
@@ -376,7 +254,7 @@ export default function CameraFeed() {
     }, 1000);
   };
 
-  // Retake Action: Resets captured photos array to [] and returns to live camera feed
+  // Retake Action: Resets capturedPhotos to [] and returns to live feed
   const handleRetake = () => {
     if (activeIntervalRef.current) clearInterval(activeIntervalRef.current);
     if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current);
@@ -385,59 +263,19 @@ export default function CameraFeed() {
     setCurrentCountdown(null);
     setCurrentPoseIndex(0);
     setIsFlashing(false);
-    setPreviewDataUrl(null);
   };
 
-  // Download Handler for PNG
-  const handleDownloadPNG = async () => {
-    try {
-      setIsDownloading(true);
-      const canvas = await generatePhotoStripCanvas();
-      if (!canvas) return;
-
-      const dataUrl = canvas.toDataURL("image/png");
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `photobooth-strip-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error("Failed to download photo strip:", err);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  // Share Handler
-  const handleShare = async () => {
-    try {
-      const canvas = await generatePhotoStripCanvas();
-      if (!canvas) return;
-
-      const dataUrl = canvas.toDataURL("image/png");
-
-      if (navigator.share) {
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        const file = new File([blob], "photobooth-strip.png", { type: "image/png" });
-        await navigator.share({
-          title: "My Photobooth Memory",
-          text: "Check out my photo strip!",
-          files: [file],
-        });
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        setShareFeedback("Link copied to clipboard!");
-        setTimeout(() => setShareFeedback(null), 3000);
-      }
-    } catch (err) {
-      console.warn("Share operation cancelled or unsupported:", err);
+  // DONE Button Handler: Triggers parent state change (setCurrentStep('preview')) to unmount camera & mount printer preview page
+  const handleDone = () => {
+    const images = capturedPhotos.map((p) => p.dataUrl);
+    if (onComplete) {
+      onComplete(images);
     }
   };
 
   const handleLayoutChange = (layout: PhotoboothLayout) => {
     setSelectedLayout(layout);
+    if (propOnSelectLayout) propOnSelectLayout(layout);
     handleRetake();
   };
 
@@ -462,13 +300,13 @@ export default function CameraFeed() {
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
-              {isReviewState ? "Review Mode" : "Live Feed"}
+              {isComplete ? `Captured (${capturedPhotos.length}/${selectedLayout.poseCount})` : "Live Feed"}
             </span>
           </div>
         </div>
 
         {/* Wireframe Layout Selector */}
-        {!isReviewState && (
+        {!isComplete && (
           <LayoutSelector
             selectedLayout={selectedLayout}
             onSelectLayout={handleLayoutChange}
@@ -477,10 +315,10 @@ export default function CameraFeed() {
         )}
       </header>
 
-      {/* Main Viewport / Review Section */}
+      {/* Main Viewport Section */}
       <main className="w-full flex-1 flex flex-col items-center justify-center my-2">
-        {/* TOP CONTROL BAR (Only visible during live camera feed) */}
-        {!isReviewState && (
+        {/* TOP CONTROL BAR (Above Video Feed) */}
+        {!isComplete && (
           <div className="w-full flex items-center justify-center gap-3 sm:gap-4 mb-4 flex-wrap z-10">
             <select
               value={selectedDeviceId || facingMode}
@@ -540,230 +378,155 @@ export default function CameraFeed() {
           </div>
         )}
 
-        {/* REVIEW STATE: PRINTER HARDWARE & FRAMER MOTION ROLLOUT ANIMATION */}
-        {isReviewState ? (
-          <div className="w-full max-w-md mx-auto flex flex-col items-center animate-in fade-in zoom-in-95 duration-300 my-4">
-            {/* PRINTER HARDWARE (TOP CONTAINER - z-20) */}
-            <div className="w-full bg-zinc-800 rounded-3xl p-4 sm:p-5 relative shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-3px_6px_rgba(0,0,0,0.6)] border border-zinc-700/50 z-20">
-              <div className="flex items-center justify-between px-2">
-                {/* Dynamic Printer Feedback: Printing... with blinking green LED vs Ready ✦ with static yellow LED */}
-                <span className="text-white font-serif italic text-sm sm:text-base tracking-wide flex items-center gap-1.5">
-                  {isPrinting ? "Printing..." : "Ready ✦"}
-                </span>
-
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    isPrinting
-                      ? "bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"
-                      : "bg-yellow-400 shadow-[0_0_8px_#facc15]"
-                  }`}
-                />
-              </div>
-
-              {/* Exit Slot: Dark horizontal div at bottom of printer hardware */}
-              <div className="w-full h-2.5 bg-zinc-950 rounded-full border border-black/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] mt-4 overflow-hidden" />
-            </div>
-
-            {/* THE MASK CONTAINER (overflow-hidden, flush against exit slot bottom -mt-2, z-10) */}
-            <div className="relative z-10 -mt-2 bg-amber-950/80 p-3 sm:p-4 rounded-b-2xl shadow-2xl border border-amber-900/40 flex flex-col items-center justify-center max-w-sm w-full overflow-hidden transition-all">
-              {previewDataUrl ? (
-                <motion.div
-                  key={previewDataUrl}
-                  initial={{ y: "-100%", filter: "blur(8px)" }}
-                  animate={{ y: "0%", filter: "blur(0px)" }}
-                  transition={{ duration: 2.5, ease: "easeOut" }}
-                  className="w-full flex justify-center"
-                >
-                  <img
-                    src={previewDataUrl}
-                    alt="Printed Photo Strip"
-                    className="max-h-[55vh] object-contain rounded-lg shadow-xl border border-white/20"
-                  />
-                </motion.div>
-              ) : (
-                <div className="flex flex-col items-center justify-center text-white py-12 gap-2">
-                  <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-                  <p className="text-xs font-semibold">Printing Photo Strip...</p>
-                </div>
-              )}
-            </div>
-
-            {/* TYPOGRAPHY BELOW PHOTO STRIP */}
-            <div className="mt-6 text-center">
-              <p className="font-serif italic text-orange-500 text-sm sm:text-base tracking-wide mb-1">
-                a moment, kept ✦
-              </p>
-              <h2 className="font-serif italic text-orange-500 text-2xl sm:text-3xl font-bold tracking-tight">
-                Ready to share ✦
-              </h2>
-            </div>
-
-            {/* ACTION BUTTONS (VERTICAL FLEX STACK) */}
-            <div className="flex flex-col gap-3 w-full max-w-xs sm:max-w-sm mx-auto mt-6">
-              {/* 1. Download PNG: Solid orange fill */}
-              <button
-                type="button"
-                onClick={handleDownloadPNG}
-                disabled={isDownloading}
-                className="bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all w-full text-base disabled:opacity-50"
-              >
-                {isDownloading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-white" />
-                ) : (
-                  <Download className="w-5 h-5 text-white" />
-                )}
-                <span>Download PNG</span>
-              </button>
-
-              {/* 2. Save GIF & Save Video: Side-by-side flex row */}
-              <div className="flex items-center gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={handleDownloadPNG}
-                  className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
-                >
-                  <FileImage className="w-4 h-4 text-orange-500" />
-                  <span>Save GIF</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadPNG}
-                  className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
-                >
-                  <Film className="w-4 h-4 text-orange-500" />
-                  <span>Save Video</span>
-                </button>
-              </div>
-
-              {/* 3. Share: Full width, dark gray fill */}
-              <button
-                type="button"
-                onClick={handleShare}
-                className="bg-zinc-900 hover:bg-zinc-800 active:scale-98 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md border border-white/10 flex items-center justify-center gap-2 cursor-pointer transition-all w-full text-sm sm:text-base"
-              >
-                <Share2 className="w-4 h-4 text-white" />
-                <span>Share</span>
-              </button>
-
-              {shareFeedback && (
-                <p className="text-xs text-orange-400 text-center font-semibold animate-pulse">
-                  {shareFeedback}
-                </p>
-              )}
-
-              {/* Retake Session Option */}
-              <button
-                type="button"
-                onClick={handleRetake}
-                className="mt-2 text-xs font-semibold text-neutral-400 hover:text-white flex items-center justify-center gap-1.5 py-1.5 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Take new photos</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* LIVE VIEWPORT CONTAINER */
+        {/* CAMERA VIEWPORT CONTAINER */}
+        <div
+          ref={containerRef}
+          className="relative w-full max-w-3xl aspect-[4/3] bg-black overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
+        >
+          {/* White Flash Effect Overlay */}
           <div
-            ref={containerRef}
-            className="relative w-full max-w-3xl aspect-[4/3] bg-black overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
+            className={`absolute inset-0 bg-white z-40 pointer-events-none transition-opacity duration-150 ${
+              isFlashing ? "opacity-100" : "opacity-0"
+            }`}
+          />
+
+          {/* Webcam Component */}
+          <Webcam
+            audio={false}
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            videoConstraints={videoConstraints}
+            onUserMedia={handleUserMedia}
+            onUserMediaError={handleUserMediaError}
+            mirrored={isMirrored}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+
+          {/* Loading Overlay */}
+          {!isCameraReady && !hasError && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-6 text-center">
+              <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-3" />
+              <p className="text-sm font-semibold text-white">Initializing Camera...</p>
+            </div>
+          )}
+
+          {/* Error Overlay */}
+          {hasError && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
+              <CameraOff className="w-12 h-12 text-red-400 mb-3" />
+              <h3 className="text-base font-bold text-white mb-1">Camera Unavailable</h3>
+              <p className="text-xs text-neutral-400 max-w-xs mb-4">{errorMessage}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-neutral-200"
+              >
+                Reload Page
+              </button>
+            </div>
+          )}
+
+          {/* Visual Countdown Overlay */}
+          {sessionStatus === "countdown" && currentCountdown !== null && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
+              <div className="relative flex items-center justify-center">
+                <div className="absolute w-36 h-36 rounded-full bg-orange-500/30 animate-ping" />
+                <div className="w-28 h-28 rounded-full bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
+                  <span className="text-6xl font-black text-white tracking-tighter animate-pulse">
+                    {currentCountdown}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs font-semibold text-orange-400">
+                Get ready for Pose #{currentPoseIndex + 1}!
+              </div>
+            </div>
+          )}
+
+          {/* Pause Between Poses Overlay */}
+          {sessionStatus === "capturing" && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+              <div className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                <span>Pose #{currentPoseIndex + 1} Captured! Next coming up...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Completion Badge Overlay */}
+          {isComplete && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-5 py-2 rounded-full bg-orange-500/90 text-white font-bold text-xs shadow-xl backdrop-blur-md flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>All {selectedLayout.poseCount} Poses Captured!</span>
+            </div>
+          )}
+
+          {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title="Toggle Fullscreen"
+            className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
           >
-            {/* White Flash Effect Overlay */}
-            <div
-              className={`absolute inset-0 bg-white z-40 pointer-events-none transition-opacity duration-150 ${
-                isFlashing ? "opacity-100" : "opacity-0"
-              }`}
-            />
-
-            {/* Webcam Component */}
-            <Webcam
-              audio={false}
-              ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              videoConstraints={videoConstraints}
-              onUserMedia={handleUserMedia}
-              onUserMediaError={handleUserMediaError}
-              mirrored={isMirrored}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-
-            {/* Loading Overlay */}
-            {!isCameraReady && !hasError && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-6 text-center">
-                <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-3" />
-                <p className="text-sm font-semibold text-white">Initializing Camera...</p>
-              </div>
+            {isFullscreen ? (
+              <Minimize2 className="w-4 h-4 text-slate-800" />
+            ) : (
+              <Maximize2 className="w-4 h-4 text-slate-800" />
             )}
+            <span>Fullscreen</span>
+          </button>
+        </div>
 
-            {/* Error Overlay */}
-            {hasError && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
-                <CameraOff className="w-12 h-12 text-red-400 mb-3" />
-                <h3 className="text-base font-bold text-white mb-1">Camera Unavailable</h3>
-                <p className="text-xs text-neutral-400 max-w-xs mb-4">{errorMessage}</p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-neutral-200"
-                >
-                  Reload Page
-                </button>
-              </div>
-            )}
-
-            {/* Visual Countdown Overlay */}
-            {sessionStatus === "countdown" && currentCountdown !== null && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
-                <div className="relative flex items-center justify-center">
-                  <div className="absolute w-36 h-36 rounded-full bg-orange-500/30 animate-ping" />
-                  <div className="w-28 h-28 rounded-full bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
-                    <span className="text-6xl font-black text-white tracking-tighter animate-pulse">
-                      {currentCountdown}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs font-semibold text-orange-400">
-                  Get ready for Pose #{currentPoseIndex + 1}!
-                </div>
-              </div>
-            )}
-
-            {/* Pause Between Poses Overlay */}
-            {sessionStatus === "capturing" && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
-                <div className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  <span>Pose #{currentPoseIndex + 1} Captured! Next coming up...</span>
-                </div>
-              </div>
-            )}
-
-            {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
+        {/* CONDITIONAL BOTTOM CONTROL BAR */}
+        {isComplete ? (
+          /* AFTER CAPTURE (isComplete): Hides initial 3 buttons and renders 4 review buttons */
+          <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap overflow-x-auto py-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* 1. Mirror: Off (White background, gray border/text) */}
             <button
               type="button"
-              onClick={toggleFullscreen}
-              title="Toggle Fullscreen"
-              className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
+              onClick={() => setIsMirrored((prev) => !prev)}
+              className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide shadow-sm active:scale-95"
             >
-              {isFullscreen ? (
-                <Minimize2 className="w-4 h-4 text-slate-800" />
-              ) : (
-                <Maximize2 className="w-4 h-4 text-slate-800" />
-              )}
-              <span>Fullscreen</span>
+              <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+            </button>
+
+            {/* 2. Retake (Solid bg-orange-500, white text) -> Wired to setCapturedPhotos([]) / reset session */}
+            <button
+              type="button"
+              onClick={handleRetake}
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Retake</span>
+            </button>
+
+            {/* 3. DONE (White background, border-orange-500 border, text-orange-500 text) -> Triggers parent state change setCurrentStep('preview') */}
+            <button
+              type="button"
+              onClick={handleDone}
+              className="bg-white border-2 border-orange-500 text-orange-500 hover:bg-orange-50 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide shadow-sm flex items-center gap-2 active:scale-95"
+            >
+              <CheckCircle2 className="w-4 h-4 text-orange-500" />
+              <span>DONE</span>
+            </button>
+
+            {/* 4. Flash: On (Solid bg-orange-500, white text) */}
+            <button
+              type="button"
+              onClick={() => setIsFlashOn((prev) => !prev)}
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide"
+            >
+              <span>Flash: {isFlashOn ? "On" : "Off"}</span>
             </button>
           </div>
-        )}
-
-        {/* STANDARD LIVE CAMERA CONTROL BAR */}
-        {!isReviewState && (
+        ) : (
+          /* BEFORE CAPTURE (!isComplete): Render 3 initial solid orange buttons (Mirror, START, Flash) */
           <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
             <button
               type="button"
@@ -799,41 +562,39 @@ export default function CameraFeed() {
         )}
       </main>
 
-      {/* Thumbnail Preview Strip (Only during live mode) */}
-      {!isReviewState && (
-        <div className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto py-1">
-          {Array.from({ length: selectedLayout.poseCount }).map((_, idx) => {
-            const captured = capturedPhotos.find((p) => p.poseIndex === idx);
+      {/* Thumbnail Preview Strip */}
+      <div className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto py-1">
+        {Array.from({ length: selectedLayout.poseCount }).map((_, idx) => {
+          const captured = capturedPhotos.find((p) => p.poseIndex === idx);
 
-            return (
-              <div
-                key={idx}
-                className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 overflow-hidden flex-shrink-0 flex items-center justify-center bg-neutral-900 transition-all ${
-                  captured
-                    ? "border-orange-500 shadow-md shadow-orange-500/20"
-                    : idx === currentPoseIndex && sessionStatus === "countdown"
-                    ? "border-orange-500 animate-pulse"
-                    : "border-white/10"
-                }`}
-              >
-                {captured ? (
-                  <img
-                    src={captured.dataUrl}
-                    alt={`Pose ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="text-center p-1">
-                    <span className="text-[10px] font-bold text-neutral-500 block">
-                      Pose #{idx + 1}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+          return (
+            <div
+              key={idx}
+              className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 overflow-hidden flex-shrink-0 flex items-center justify-center bg-neutral-900 transition-all ${
+                captured
+                  ? "border-orange-500 shadow-md shadow-orange-500/20"
+                  : idx === currentPoseIndex && sessionStatus === "countdown"
+                  ? "border-orange-500 animate-pulse"
+                  : "border-white/10"
+              }`}
+            >
+              {captured ? (
+                <img
+                  src={captured.dataUrl}
+                  alt={`Pose ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-center p-1">
+                  <span className="text-[10px] font-bold text-neutral-500 block">
+                    Pose #{idx + 1}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
