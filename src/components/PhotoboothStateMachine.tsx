@@ -338,20 +338,20 @@ export default function PhotoboothStateMachine() {
             </div>
 
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4">
-              Capture Your <span className="text-[#FF6B00] drop-shadow-[0_2px_12px_rgba(255,107,0,0.4)]">Best Moments</span>
+              Capture Your <span className="text-orange-500">Best Moments</span>
             </h1>
             <p className="font-serif italic text-gray-200 text-lg md:text-xl max-w-md mb-10 leading-relaxed font-normal">
               Step right up! Choose your custom layout, strike your best poses, and create timeless photo strips.
             </p>
 
-            {/* Glossy 3D CTA Button with Continuous Breathing Neon Glow */}
+            {/* Tactile 3D CTA Button with Breathing Orange Outer Shadow */}
             <button
               onClick={() => setCurrentStep("layout")}
-              className="group relative inline-flex items-center justify-center px-14 py-5 rounded-full bg-gradient-to-b from-[#ff8800] via-[#ff5500] to-[#d43f00] border border-orange-300/50 text-white font-black text-xl md:text-2xl tracking-wider animate-breathing-glow hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer overflow-hidden"
+              className="group relative inline-flex items-center justify-center px-14 py-5 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 border border-orange-300/40 text-white font-black text-xl md:text-2xl tracking-wider animate-breathing-shadow hover:scale-[1.02] active:scale-[0.98] transition-transform duration-300 cursor-pointer overflow-hidden"
             >
               {/* Glossy Top Sheen Reflection */}
-              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/40 to-transparent rounded-t-full pointer-events-none" />
-              <span className="relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">ENTER -&gt;</span>
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full pointer-events-none" />
+              <span className="relative z-10 font-black text-white">ENTER -&gt;</span>
             </button>
           </div>
         )}
