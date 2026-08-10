@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Webcam from "react-webcam";
+import { motion } from "framer-motion";
 import LayoutSelector from "@/components/LayoutSelector";
 import {
   FacingMode,
@@ -58,6 +59,9 @@ export default function CameraFeed() {
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
+  // Printing animation state: true during mechanical rollout (2.5s)
+  const [isPrinting, setIsPrinting] = useState<boolean>(true);
+
   const webcamRef = useRef<Webcam>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +73,19 @@ export default function CameraFeed() {
   const isReviewState =
     capturedPhotos.length > 0 &&
     capturedPhotos.length === selectedLayout.poseCount;
+
+  // Handle printing timer feedback state
+  useEffect(() => {
+    if (isReviewState) {
+      setIsPrinting(true);
+      const timer = setTimeout(() => {
+        setIsPrinting(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    } else {
+      setIsPrinting(true);
+    }
+  }, [isReviewState]);
 
   // Stable Memoized Video Constraints
   const videoConstraints = useMemo<MediaTrackConstraints>(() => {
@@ -523,33 +540,46 @@ export default function CameraFeed() {
           </div>
         )}
 
-        {/* REVIEW STATE: PRINTER HARDWARE & AESTHETIC EXIT SLOT DESIGN */}
+        {/* REVIEW STATE: PRINTER HARDWARE & FRAMER MOTION ROLLOUT ANIMATION */}
         {isReviewState ? (
           <div className="w-full max-w-md mx-auto flex flex-col items-center animate-in fade-in zoom-in-95 duration-300 my-4">
-            {/* PRINTER HARDWARE (TOP CONTAINER) */}
+            {/* PRINTER HARDWARE (TOP CONTAINER - z-20) */}
             <div className="w-full bg-zinc-800 rounded-3xl p-4 sm:p-5 relative shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-3px_6px_rgba(0,0,0,0.6)] border border-zinc-700/50 z-20">
               <div className="flex items-center justify-between px-2">
-                {/* Left: White italic text 'Ready ✦' */}
+                {/* Dynamic Printer Feedback: Printing... with blinking green LED vs Ready ✦ with static yellow LED */}
                 <span className="text-white font-serif italic text-sm sm:text-base tracking-wide flex items-center gap-1.5">
-                  Ready ✦
+                  {isPrinting ? "Printing..." : "Ready ✦"}
                 </span>
 
-                {/* Right: Small glowing yellow dot */}
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]" />
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    isPrinting
+                      ? "bg-green-500 animate-pulse shadow-[0_0_8px_#22c55e]"
+                      : "bg-yellow-400 shadow-[0_0_8px_#facc15]"
+                  }`}
+                />
               </div>
 
-              {/* Exit Slot: Horizontal dark div at bottom of printer hardware */}
+              {/* Exit Slot: Dark horizontal div at bottom of printer hardware */}
               <div className="w-full h-2.5 bg-zinc-950 rounded-full border border-black/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] mt-4 overflow-hidden" />
             </div>
 
-            {/* THE PHOTO STRIP WRAPPER (Tucked behind printer slot using negative margin & z-10) */}
-            <div className="relative z-10 -mt-2 bg-amber-950/80 p-3 sm:p-4 rounded-b-2xl shadow-2xl border border-amber-900/40 flex flex-col items-center justify-center max-w-sm w-full transition-all">
+            {/* THE MASK CONTAINER (overflow-hidden, flush against exit slot bottom -mt-2, z-10) */}
+            <div className="relative z-10 -mt-2 bg-amber-950/80 p-3 sm:p-4 rounded-b-2xl shadow-2xl border border-amber-900/40 flex flex-col items-center justify-center max-w-sm w-full overflow-hidden transition-all">
               {previewDataUrl ? (
-                <img
-                  src={previewDataUrl}
-                  alt="Printed Photo Strip"
-                  className="max-h-[55vh] object-contain rounded-lg shadow-xl border border-white/20 animate-in fade-in slide-in-from-top-4 duration-500"
-                />
+                <motion.div
+                  key={previewDataUrl}
+                  initial={{ y: "-100%", filter: "blur(8px)" }}
+                  animate={{ y: "0%", filter: "blur(0px)" }}
+                  transition={{ duration: 2.5, ease: "easeOut" }}
+                  className="w-full flex justify-center"
+                >
+                  <img
+                    src={previewDataUrl}
+                    alt="Printed Photo Strip"
+                    className="max-h-[55vh] object-contain rounded-lg shadow-xl border border-white/20"
+                  />
+                </motion.div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-white py-12 gap-2">
                   <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
