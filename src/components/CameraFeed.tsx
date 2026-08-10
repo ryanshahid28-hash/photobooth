@@ -23,6 +23,7 @@ import {
   UploadCloud,
   Maximize2,
   Minimize2,
+  Download,
 } from "lucide-react";
 
 export default function CameraFeed() {
@@ -35,7 +36,7 @@ export default function CameraFeed() {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
 
-  // New Required States
+  // Controls States
   const [isMirrored, setIsMirrored] = useState<boolean>(false);
   const [isFlashOn, setIsFlashOn] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -50,6 +51,8 @@ export default function CameraFeed() {
   const [currentPoseIndex, setCurrentPoseIndex] = useState<number>(0);
   const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   const webcamRef = useRef<Webcam>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,6 +60,11 @@ export default function CameraFeed() {
 
   const activeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Review state check: true when all poses are captured
+  const isReviewState =
+    capturedPhotos.length > 0 &&
+    capturedPhotos.length === selectedLayout.poseCount;
 
   // Stable Memoized Video Constraints
   const videoConstraints = useMemo<MediaTrackConstraints>(() => {
@@ -113,6 +121,122 @@ export default function CameraFeed() {
     setErrorMessage(msg);
   }, []);
 
+  // Generate Photo Strip Composited Image for Review Preview & Download
+  const generatePhotoStripCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
+    if (capturedPhotos.length === 0) return null;
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    const poseCount = capturedPhotos.length;
+    const canvasWidth = 600;
+    const padding = 24;
+    const photoWidth = canvasWidth - padding * 2;
+    const targetAspectRatio = 3 / 4;
+    const photoHeight = Math.round(photoWidth / targetAspectRatio);
+    const footerHeight = 130;
+    const canvasHeight = padding + poseCount * (photoHeight + padding) + footerHeight;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    const loadImage = (src: string): Promise<HTMLImageElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = (err) => reject(err);
+        img.src = src;
+      });
+    };
+
+    for (let i = 0; i < poseCount; i++) {
+      try {
+        const img = await loadImage(capturedPhotos[i].dataUrl);
+        const x = padding;
+        const y = padding + i * (photoHeight + padding);
+
+        const imgWidth = img.naturalWidth || img.width;
+        const imgHeight = img.naturalHeight || img.height;
+        const imgAspect = imgWidth / imgHeight;
+
+        let sx = 0;
+        let sy = 0;
+        let sWidth = imgWidth;
+        let sHeight = imgHeight;
+
+        if (imgAspect > targetAspectRatio) {
+          sWidth = imgHeight * targetAspectRatio;
+          sHeight = imgHeight;
+          sx = (imgWidth - sWidth) / 2;
+          sy = 0;
+        } else if (imgAspect < targetAspectRatio) {
+          sWidth = imgWidth;
+          sHeight = imgWidth / targetAspectRatio;
+          sx = 0;
+          sy = (imgHeight - sHeight) / 2;
+        }
+
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWidth, photoHeight);
+
+        ctx.strokeStyle = "#E5E5E5";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, photoWidth, photoHeight);
+      } catch (err) {
+        console.error("Error drawing photo onto canvas:", err);
+      }
+    }
+
+    const footerY = canvasHeight - footerHeight;
+
+    ctx.strokeStyle = "#F97316";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(padding, footerY + 15);
+    ctx.lineTo(canvasWidth - padding, footerY + 15);
+    ctx.stroke();
+
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 26px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Your Shop Logo Here", canvasWidth / 2, footerY + 60);
+
+    const now = new Date();
+    const formattedDate =
+      now.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }) +
+      " • " +
+      now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+    ctx.fillStyle = "#6B7280";
+    ctx.font = "14px sans-serif";
+    ctx.fillText(`PHOTOBOOTH MEMORY • ${formattedDate}`, canvasWidth / 2, footerY + 90);
+
+    return canvas;
+  }, [capturedPhotos]);
+
+  // Update preview image data URL whenever capturedPhotos changes to review state
+  useEffect(() => {
+    if (isReviewState) {
+      generatePhotoStripCanvas().then((canvas) => {
+        if (canvas) {
+          setPreviewDataUrl(canvas.toDataURL("image/png"));
+        }
+      });
+    } else {
+      setPreviewDataUrl(null);
+    }
+  }, [isReviewState, generatePhotoStripCanvas]);
+
   // Fullscreen Toggle Handler
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -130,7 +254,6 @@ export default function CameraFeed() {
     }
   };
 
-  // Fullscreen Change Listener
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -232,20 +355,42 @@ export default function CameraFeed() {
     }, 1000);
   };
 
-  // Reset Session
-  const resetSession = () => {
+  // Retake Action: Resets captured photos array to [] and returns to live camera feed
+  const handleRetake = () => {
     if (activeIntervalRef.current) clearInterval(activeIntervalRef.current);
     if (activeTimeoutRef.current) clearTimeout(activeTimeoutRef.current);
-    setSessionStatus("idle");
     setCapturedPhotos([]);
+    setSessionStatus("idle");
     setCurrentCountdown(null);
     setCurrentPoseIndex(0);
     setIsFlashing(false);
+    setPreviewDataUrl(null);
+  };
+
+  // Download Handler for DONE button
+  const handleDownloadDone = async () => {
+    try {
+      setIsDownloading(true);
+      const canvas = await generatePhotoStripCanvas();
+      if (!canvas) return;
+
+      const dataUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `photobooth-strip-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download photo strip:", err);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleLayoutChange = (layout: PhotoboothLayout) => {
     setSelectedLayout(layout);
-    resetSession();
+    handleRetake();
   };
 
   return (
@@ -269,7 +414,7 @@ export default function CameraFeed() {
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
-              Live Feed
+              {isReviewState ? "Review Mode" : "Live Feed"}
             </span>
           </div>
         </div>
@@ -346,93 +491,111 @@ export default function CameraFeed() {
           </select>
         </div>
 
-        {/* RELATIVE VIDEO CONTAINER */}
+        {/* RELATIVE VIEWPORT CONTAINER */}
         <div
           ref={containerRef}
           className="relative w-full max-w-3xl aspect-[4/3] bg-black overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
         >
-          {/* White Flash Effect Overlay */}
-          <div
-            className={`absolute inset-0 bg-white z-40 pointer-events-none transition-opacity duration-150 ${
-              isFlashing ? "opacity-100" : "opacity-0"
-            }`}
-          />
-
-          {/* Camera Stream */}
-          <Webcam
-            audio={false}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            videoConstraints={videoConstraints}
-            onUserMedia={handleUserMedia}
-            onUserMediaError={handleUserMediaError}
-            mirrored={isMirrored}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-
-          {/* Loading Overlay */}
-          {!isCameraReady && !hasError && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-6 text-center">
-              <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-3" />
-              <p className="text-sm font-semibold text-white">Initializing Camera...</p>
-            </div>
-          )}
-
-          {/* Error Overlay */}
-          {hasError && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
-              <CameraOff className="w-12 h-12 text-red-400 mb-3" />
-              <h3 className="text-base font-bold text-white mb-1">Camera Unavailable</h3>
-              <p className="text-xs text-neutral-400 max-w-xs mb-4">{errorMessage}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-neutral-200"
-              >
-                Reload Page
-              </button>
-            </div>
-          )}
-
-          {/* Visual Countdown Overlay */}
-          {sessionStatus === "countdown" && currentCountdown !== null && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
-              <div className="relative flex items-center justify-center">
-                <div className="absolute w-36 h-36 rounded-full bg-orange-500/30 animate-ping" />
-                <div className="w-28 h-28 rounded-full bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
-                  <span className="text-6xl font-black text-white tracking-tighter animate-pulse">
-                    {currentCountdown}
-                  </span>
+          {/* STATE TRIGGER: In Review State -> Unmount/Hide live <Webcam/> feed and render Photo Strip Preview */}
+          {isReviewState ? (
+            <div className="relative w-full h-full flex flex-col items-center justify-center p-4 bg-neutral-900 overflow-y-auto">
+              {previewDataUrl ? (
+                <div className="relative max-h-full flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-300">
+                  <img
+                    src={previewDataUrl}
+                    alt="Final Photo Strip Preview"
+                    className="max-h-[75vh] object-contain rounded-xl shadow-2xl border border-white/20"
+                  />
+                  <div className="mt-2 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 text-orange-400 text-xs font-semibold">
+                    Photo Strip Review Preview
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs font-semibold text-orange-400">
-                Get ready for Pose #{currentPoseIndex + 1}!
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-white gap-2">
+                  <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+                  <p className="text-xs font-semibold">Compositing Photo Strip...</p>
+                </div>
+              )}
             </div>
-          )}
+          ) : (
+            /* Live Camera Feed & Overlays */
+            <>
+              {/* White Flash Effect Overlay */}
+              <div
+                className={`absolute inset-0 bg-white z-40 pointer-events-none transition-opacity duration-150 ${
+                  isFlashing ? "opacity-100" : "opacity-0"
+                }`}
+              />
 
-          {/* Pause Between Poses Overlay */}
-          {sessionStatus === "capturing" && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
-              <div className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                <span>Pose #{currentPoseIndex + 1} Captured! Next coming up...</span>
-              </div>
-            </div>
-          )}
+              {/* Webcam Component */}
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
+                videoConstraints={videoConstraints}
+                onUserMedia={handleUserMedia}
+                onUserMediaError={handleUserMediaError}
+                mirrored={isMirrored}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
 
-          {/* Completion Overlay Banner */}
-          {sessionStatus === "completed" && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-5 py-2 rounded-full bg-emerald-500/90 text-white font-bold text-xs shadow-xl backdrop-blur-md flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>All {selectedLayout.poseCount} Poses Captured!</span>
-            </div>
+              {/* Loading Overlay */}
+              {!isCameraReady && !hasError && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-6 text-center">
+                  <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-3" />
+                  <p className="text-sm font-semibold text-white">Initializing Camera...</p>
+                </div>
+              )}
+
+              {/* Error Overlay */}
+              {hasError && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
+                  <CameraOff className="w-12 h-12 text-red-400 mb-3" />
+                  <h3 className="text-base font-bold text-white mb-1">Camera Unavailable</h3>
+                  <p className="text-xs text-neutral-400 max-w-xs mb-4">{errorMessage}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 rounded-xl bg-white text-black font-semibold text-xs hover:bg-neutral-200"
+                  >
+                    Reload Page
+                  </button>
+                </div>
+              )}
+
+              {/* Visual Countdown Overlay */}
+              {sessionStatus === "countdown" && currentCountdown !== null && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute w-36 h-36 rounded-full bg-orange-500/30 animate-ping" />
+                    <div className="w-28 h-28 rounded-full bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
+                      <span className="text-6xl font-black text-white tracking-tighter animate-pulse">
+                        {currentCountdown}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs font-semibold text-orange-400">
+                    Get ready for Pose #{currentPoseIndex + 1}!
+                  </div>
+                </div>
+              )}
+
+              {/* Pause Between Poses Overlay */}
+              {sessionStatus === "capturing" && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                  <div className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Pose #{currentPoseIndex + 1} Captured! Next coming up...</span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
@@ -451,42 +614,91 @@ export default function CameraFeed() {
           </button>
         </div>
 
-        {/* BOTTOM CONTROL BAR (Below Video Feed) */}
-        <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
-          {/* Mirror Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsMirrored((prev) => !prev)}
-            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
-          >
-            <span>Mirror: {isMirrored ? "On" : "Off"}</span>
-          </button>
+        {/* BOTTOM CONTROL BAR */}
+        {isReviewState ? (
+          /* CONTROL BAR SWAP: REVIEW STATE BUTTONS */
+          <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Mirror: Outlined style */}
+            <button
+              type="button"
+              onClick={() => setIsMirrored((prev) => !prev)}
+              className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide active:scale-95"
+            >
+              <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+            </button>
 
-          {/* Start Button */}
-          <button
-            type="button"
-            onClick={startSequence}
-            disabled={
-              !isCameraReady ||
-              hasError ||
-              sessionStatus === "countdown" ||
-              sessionStatus === "capturing"
-            }
-            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-8 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Camera className="w-4 h-4" />
-            <span>START</span>
-          </button>
+            {/* Retake: Solid fill (Resets capturedPhotos to [] & returns UI to live camera feed) */}
+            <button
+              type="button"
+              onClick={handleRetake}
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Retake</span>
+            </button>
 
-          {/* Flash Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsFlashOn((prev) => !prev)}
-            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
-          >
-            <span>Flash: {isFlashOn ? "On" : "Off"}</span>
-          </button>
-        </div>
+            {/* DONE: Outlined style (Hooked up to Canvas download function) */}
+            <button
+              type="button"
+              onClick={handleDownloadDone}
+              disabled={isDownloading}
+              className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide flex items-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              {isDownloading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>DONE</span>
+            </button>
+
+            {/* Flash: Solid fill */}
+            <button
+              type="button"
+              onClick={() => setIsFlashOn((prev) => !prev)}
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide"
+            >
+              <span>Flash: {isFlashOn ? "On" : "Off"}</span>
+            </button>
+          </div>
+        ) : (
+          /* STANDARD LIVE CAMERA CONTROL BAR */
+          <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
+            {/* Mirror Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsMirrored((prev) => !prev)}
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
+            >
+              <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+            </button>
+
+            {/* Start Button */}
+            <button
+              type="button"
+              onClick={startSequence}
+              disabled={
+                !isCameraReady ||
+                hasError ||
+                sessionStatus === "countdown" ||
+                sessionStatus === "capturing"
+              }
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-8 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Camera className="w-4 h-4" />
+              <span>START</span>
+            </button>
+
+            {/* Flash Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setIsFlashOn((prev) => !prev)}
+              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
+            >
+              <span>Flash: {isFlashOn ? "On" : "Off"}</span>
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Thumbnail Preview Strip */}
@@ -499,7 +711,7 @@ export default function CameraFeed() {
               key={idx}
               className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 overflow-hidden flex-shrink-0 flex items-center justify-center bg-neutral-900 transition-all ${
                 captured
-                  ? "border-emerald-500 shadow-md shadow-emerald-500/10"
+                  ? "border-orange-500 shadow-md shadow-orange-500/20"
                   : idx === currentPoseIndex && sessionStatus === "countdown"
                   ? "border-orange-500 animate-pulse"
                   : "border-white/10"
@@ -522,29 +734,6 @@ export default function CameraFeed() {
           );
         })}
       </div>
-
-      {/* Footer Action Buttons when completed */}
-      {sessionStatus === "completed" && (
-        <footer className="w-full max-w-3xl mx-auto flex items-center justify-center gap-4 py-2">
-          <div className="flex items-center gap-3 w-full max-w-md justify-center">
-            <button
-              onClick={resetSession}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white font-semibold text-sm border border-white/10 transition-all cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Retake Photos</span>
-            </button>
-
-            <button
-              onClick={startSequence}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold text-sm transition-all shadow-lg cursor-pointer"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>Start New Session</span>
-            </button>
-          </div>
-        </footer>
-      )}
     </div>
   );
 }
