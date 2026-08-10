@@ -203,7 +203,7 @@ export default function PhotoboothStateMachine() {
     const footerY = canvasHeight - footerHeight;
 
     // Decorative Accent Line
-    ctx.strokeStyle = "#F43F5E"; // Rose 500
+    ctx.strokeStyle = "#F97316"; // Orange 500
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(padding, footerY + 15);
@@ -351,7 +351,7 @@ export default function PhotoboothStateMachine() {
             >
               {/* Glossy Top Sheen Reflection */}
               <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full pointer-events-none" />
-              <span className="relative z-10 font-black text-white">ENTER -&gt;</span>
+              <span className="relative z-10 font-black text-white">Capture</span>
             </button>
           </div>
         )}
@@ -372,17 +372,17 @@ export default function PhotoboothStateMachine() {
                 <button
                   key={layout.id}
                   onClick={() => handleSelectLayout(layout)}
-                  className="group relative flex flex-col items-center justify-between p-6 rounded-3xl bg-neutral-900/80 border border-white/10 hover:border-rose-500/50 hover:bg-neutral-900/90 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-rose-500/10 cursor-pointer"
+                  className="group relative flex flex-col items-center justify-between p-6 rounded-3xl bg-neutral-900/80 border border-white/10 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:bg-neutral-900/90 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                 >
                   {/* Card Visual Wireframe */}
-                  <div className="w-full py-6 flex items-center justify-center bg-black/40 rounded-2xl border border-white/5 mb-4 group-hover:border-rose-500/30 transition-colors">
+                  <div className="w-full py-6 flex items-center justify-center bg-black/40 rounded-2xl border border-white/5 mb-4 group-hover:border-orange-500/30 transition-colors">
                     <div className="w-14 flex flex-col gap-1.5 p-2 rounded-lg bg-neutral-800 border border-neutral-700">
                       {Array.from({ length: layout.poseCount }).map((_, i) => (
                         <div
                           key={i}
-                          className="h-7 w-full rounded bg-neutral-700/80 border border-neutral-600 flex items-center justify-center group-hover:bg-rose-950/40 group-hover:border-rose-500/40 transition-colors"
+                          className="h-7 w-full rounded bg-neutral-700/80 border border-neutral-600 flex items-center justify-center group-hover:bg-orange-950/40 group-hover:border-orange-500/50 transition-colors"
                         >
-                          <ImageIcon className="w-3 h-3 text-neutral-400 group-hover:text-rose-400" />
+                          <ImageIcon className="w-3 h-3 text-neutral-400 group-hover:text-orange-400" />
                         </div>
                       ))}
                     </div>
@@ -390,14 +390,14 @@ export default function PhotoboothStateMachine() {
 
                   {/* Card Details */}
                   <div className="text-center w-full">
-                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-rose-400 transition-colors">
+                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-orange-500 transition-colors">
                       {layout.name}
                     </h3>
                     <p className="text-xs text-neutral-400 mb-4">
                       {layout.description}
                     </p>
 
-                    <div className="w-full py-2.5 rounded-xl bg-white/5 group-hover:bg-rose-500 group-hover:text-white text-rose-300 font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-1.5">
+                    <div className="w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/20">
                       <span>Select Template</span>
                     </div>
                   </div>
@@ -412,8 +412,8 @@ export default function PhotoboothStateMachine() {
           <div className="w-full flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-4 duration-300">
             {/* Header / Selected Layout Info */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-500 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-orange-500" />
                 <span>Layout: {selectedLayout?.name} ({targetPoses} Poses)</span>
               </div>
             </div>
@@ -444,10 +444,10 @@ export default function PhotoboothStateMachine() {
               {/* Countdown Overlay on Center of Feed */}
               {isCapturing && countdown !== null && countdown > 0 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] z-30 pointer-events-none">
-                  <div className="text-8xl md:text-9xl font-black text-white drop-shadow-[0_4px_25px_rgba(244,63,94,0.9)] animate-pulse tracking-tight">
+                  <div className="text-8xl md:text-9xl font-black text-white drop-shadow-[0_4px_25px_rgba(249,115,22,0.9)] animate-pulse tracking-tight">
                     {countdown}
                   </div>
-                  <div className="text-sm font-semibold tracking-wider text-rose-300 uppercase mt-3 px-4 py-1 rounded-full bg-black/60 border border-rose-500/30">
+                  <div className="text-sm font-semibold tracking-wider text-orange-400 uppercase mt-3 px-4 py-1 rounded-full bg-black/60 border border-orange-500/50">
                     Pose {capturedImages.length + 1} of {targetPoses}
                   </div>
                 </div>
@@ -455,7 +455,7 @@ export default function PhotoboothStateMachine() {
 
               {/* Live Pose Counter Badge */}
               <div className="absolute top-4 left-4 z-20 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isCapturing ? "bg-rose-500 animate-ping" : "bg-emerald-400"}`} />
+                <span className={`w-2 h-2 rounded-full ${isCapturing ? "bg-orange-500 animate-ping" : "bg-emerald-400"}`} />
                 <span>Poses: {capturedImages.length} / {targetPoses}</span>
               </div>
             </div>
@@ -467,7 +467,7 @@ export default function PhotoboothStateMachine() {
                 <button
                   onClick={handleStartCapture}
                   disabled={isCapturing}
-                  className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white font-bold text-lg shadow-[0_0_25px_rgba(244,63,94,0.4)] hover:shadow-[0_0_35px_rgba(244,63,94,0.65)] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold text-lg shadow-[0_0_25px_rgba(249,115,22,0.4)] hover:shadow-[0_0_35px_rgba(249,115,22,0.65)] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {isCapturing ? (
                     <>
@@ -543,7 +543,7 @@ export default function PhotoboothStateMachine() {
                       key={idx}
                       className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
                         img
-                          ? "border-rose-500 shadow-md shadow-rose-500/20 bg-black"
+                          ? "border-orange-500 shadow-md shadow-orange-500/20 bg-black"
                           : "border-white/10 bg-black/40 border-dashed"
                       }`}
                     >
