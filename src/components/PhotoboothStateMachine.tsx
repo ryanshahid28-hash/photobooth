@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Webcam from "react-webcam";
 import {
   Camera,
@@ -11,7 +11,9 @@ import {
   RotateCcw,
   Play,
   Download,
-  FileImage,
+  UploadCloud,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 export type PhotoboothStep = "start" | "layout" | "camera";
@@ -48,9 +50,11 @@ export default function PhotoboothStateMachine() {
   const [currentStep, setCurrentStep] = useState<PhotoboothStep>("start");
   const [selectedLayout, setSelectedLayout] = useState<PhotoLayout | null>(null);
 
-  // Camera & Capture Loop States
+  // Camera & Controls States
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
@@ -58,7 +62,31 @@ export default function PhotoboothStateMachine() {
   const [flash, setFlash] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
+  // New UI Controls States
+  const [isMirrored, setIsMirrored] = useState<boolean>(false);
+  const [isFlashOn, setIsFlashOn] = useState<boolean>(false);
+  const [timerDuration, setTimerDuration] = useState<number>(3);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
   const targetPoses = selectedLayout?.poseCount || 3;
+
+  // Enumerate video devices
+  const handleUserMedia = useCallback(() => {
+    if (typeof window !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((allDevices) => {
+          const videoInputs = allDevices.filter(
+            (d) => d.kind === "videoinput" && d.deviceId !== ""
+          );
+          setDevices(videoInputs);
+        })
+        .catch((err) => console.warn("Device enumeration error:", err));
+    }
+  }, []);
 
   // Handle template selection
   const handleSelectLayout = (layout: PhotoLayout) => {
@@ -73,14 +101,50 @@ export default function PhotoboothStateMachine() {
   const handleStartCapture = () => {
     setCapturedImages([]);
     setIsCapturing(true);
-    setCountdown(3);
+    setCountdown(timerDuration);
+  };
+
+  // Toggle Fullscreen Handler
+  const toggleFullscreen = () => {
+    if (!videoContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      videoContainerRef.current
+        .requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch((err) => console.error("Fullscreen error:", err));
+    } else {
+      document
+        .exitFullscreen()
+        .then(() => setIsFullscreen(false))
+        .catch((err) => console.error("Exit fullscreen error:", err));
+    }
+  };
+
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  // Image Upload Handler
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setCapturedImages((prev) => [...prev, dataUrl]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Automated Interval Capture Loop
   useEffect(() => {
     if (!isCapturing) return;
 
-    // Stop condition check
     if (capturedImages.length >= targetPoses) {
       setIsCapturing(false);
       setCountdown(null);
@@ -88,7 +152,7 @@ export default function PhotoboothStateMachine() {
     }
 
     if (countdown === null) {
-      setCountdown(3);
+      setCountdown(timerDuration);
       return;
     }
 
@@ -99,28 +163,27 @@ export default function PhotoboothStateMachine() {
       return () => clearTimeout(timer);
     }
 
-    // At Countdown 0 -> Take Screenshot
     if (countdown === 0) {
       if (webcamRef.current) {
         const imageSrc = webcamRef.current.getScreenshot();
         if (imageSrc) {
           setCapturedImages((prev) => [...prev, imageSrc]);
-          
-          // Visual Flash Trigger
-          setFlash(true);
-          setTimeout(() => setFlash(false), 200);
+
+          if (isFlashOn || flash) {
+            setFlash(true);
+            setTimeout(() => setFlash(false), 200);
+          }
         }
       }
 
-      // Check if more photos are needed
       if (capturedImages.length + 1 < targetPoses) {
-        setCountdown(3);
+        setCountdown(timerDuration);
       } else {
         setIsCapturing(false);
         setCountdown(null);
       }
     }
-  }, [isCapturing, countdown, capturedImages.length, targetPoses]);
+  }, [isCapturing, countdown, capturedImages.length, targetPoses, timerDuration, isFlashOn, flash]);
 
   // Canvas Compositor: Draw Photo Strip
   const drawPhotoStrip = async (): Promise<HTMLCanvasElement | null> => {
@@ -133,20 +196,18 @@ export default function PhotoboothStateMachine() {
     const poseCount = capturedImages.length;
     const canvasWidth = 600;
     const padding = 24;
-    const photoWidth = canvasWidth - padding * 2; // 552px
-    const targetAspectRatio = 3 / 4; // 4:3 Portrait aspect ratio (3 wide : 4 high)
-    const photoHeight = Math.round(photoWidth / targetAspectRatio); // 736px
+    const photoWidth = canvasWidth - padding * 2;
+    const targetAspectRatio = 3 / 4;
+    const photoHeight = Math.round(photoWidth / targetAspectRatio);
     const footerHeight = 130;
     const canvasHeight = padding + poseCount * (photoHeight + padding) + footerHeight;
 
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
 
-    // Fill background with clean white
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Helper to load image asynchronously
     const loadImage = (src: string): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -156,14 +217,12 @@ export default function PhotoboothStateMachine() {
       });
     };
 
-    // Draw each captured photo in sequence
     for (let i = 0; i < poseCount; i++) {
       try {
         const img = await loadImage(capturedImages[i]);
         const x = padding;
         const y = padding + i * (photoHeight + padding);
 
-        // Calculate source aspect ratio and simulate object-fit: cover
         const imgWidth = img.naturalWidth || img.width;
         const imgHeight = img.naturalHeight || img.height;
         const imgAspect = imgWidth / imgHeight;
@@ -174,23 +233,19 @@ export default function PhotoboothStateMachine() {
         let sHeight = imgHeight;
 
         if (imgAspect > targetAspectRatio) {
-          // Source image is wider than target slot relative to height -> crop left/right sides
           sWidth = imgHeight * targetAspectRatio;
           sHeight = imgHeight;
           sx = (imgWidth - sWidth) / 2;
           sy = 0;
         } else if (imgAspect < targetAspectRatio) {
-          // Source image is taller than target slot relative to width -> crop top/bottom sides
           sWidth = imgWidth;
           sHeight = imgWidth / targetAspectRatio;
           sx = 0;
           sy = (imgHeight - sHeight) / 2;
         }
 
-        // Draw cropped photo with 9-parameter drawImage
         ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWidth, photoHeight);
 
-        // Draw subtle photo frame border
         ctx.strokeStyle = "#E5E5E5";
         ctx.lineWidth = 2;
         ctx.strokeRect(x, y, photoWidth, photoHeight);
@@ -199,35 +254,34 @@ export default function PhotoboothStateMachine() {
       }
     }
 
-    // Draw Footer Area
     const footerY = canvasHeight - footerHeight;
 
-    // Decorative Accent Line
-    ctx.strokeStyle = "#F97316"; // Orange 500
+    ctx.strokeStyle = "#F97316";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(padding, footerY + 15);
     ctx.lineTo(canvasWidth - padding, footerY + 15);
     ctx.stroke();
 
-    // Footer Text: "Your Shop Logo Here"
-    ctx.fillStyle = "#111827"; // Dark Neutral
+    ctx.fillStyle = "#111827";
     ctx.font = "bold 26px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Your Shop Logo Here", canvasWidth / 2, footerY + 60);
 
-    // Footer Date & Subtitle
     const now = new Date();
-    const formattedDate = now.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }) + " • " + now.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const formattedDate =
+      now.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }) +
+      " • " +
+      now.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
-    ctx.fillStyle = "#6B7280"; // Neutral text
+    ctx.fillStyle = "#6B7280";
     ctx.font = "14px sans-serif";
     ctx.fillText(`PHOTOBOOTH MEMORY • ${formattedDate}`, canvasWidth / 2, footerY + 90);
 
@@ -241,10 +295,8 @@ export default function PhotoboothStateMachine() {
       const canvas = await drawPhotoStrip();
       if (!canvas) return;
 
-      // Convert canvas to Data URL
       const dataUrl = canvas.toDataURL("image/png");
 
-      // Programmatically create temporary <a> tag and trigger download
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = `photobooth-strip-${Date.now()}.png`;
@@ -271,46 +323,12 @@ export default function PhotoboothStateMachine() {
 
   return (
     <div className="relative min-h-screen w-full bg-[#e2e8f0] text-white flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-orange-500/30">
-      {/* Hidden HTML5 Canvas for Photo Strip Compositing */}
+      {/* Hidden Canvas */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Scattered Floating Blurred Background Client Logos at Different Depths */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute top-[6%] left-[4%] w-48 md:w-60 opacity-15 blur-[4px] -rotate-12 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute top-[12%] right-[6%] w-64 md:w-80 opacity-20 blur-[6px] rotate-45 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute bottom-[10%] left-[8%] w-56 md:w-72 opacity-10 blur-[8px] -rotate-45 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute bottom-[18%] right-[10%] w-52 md:w-64 opacity-15 blur-[3px] rotate-12 select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute top-[50%] left-[2%] w-40 md:w-52 opacity-10 blur-[5px] rotate-[160deg] select-none"
-        />
-        <img
-          src="/logo.png"
-          alt=""
-          className="absolute top-[38%] right-[2%] w-44 md:w-56 opacity-20 blur-[7px] -rotate-30 select-none"
-        />
-      </div>
-
-      {/* Main Glassmorphic Container Layer */}
+      {/* Main Container Layer */}
       <div className="relative z-10 w-full max-w-4xl flex flex-col items-center justify-center min-h-[85vh] p-6 md:p-12 rounded-3xl bg-neutral-950/65 border border-white/20 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)]">
-        {/* Step Indicator Header (Visible in Layout & Camera steps) */}
+        {/* Step Indicator Header */}
         {currentStep !== "start" && (
           <div className="w-full flex items-center justify-between mb-6 px-4 py-3 rounded-full bg-neutral-900/70 border border-white/15 backdrop-blur-md transition-all duration-300">
             <button
@@ -331,7 +349,6 @@ export default function PhotoboothStateMachine() {
         {/* SCREEN 1: START SCREEN */}
         {currentStep === "start" && (
           <div className="w-full flex flex-col items-center justify-center text-center py-12 px-6 animate-in fade-in zoom-in-95 duration-300">
-            {/* Logo / Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-white text-sm font-semibold tracking-wide mb-6">
               <Sparkles className="w-4 h-4 text-orange-400" />
               <span>Digital Photobooth</span>
@@ -344,12 +361,10 @@ export default function PhotoboothStateMachine() {
               Step right up! Choose your custom layout, strike your best poses, and create timeless photo strips.
             </p>
 
-            {/* Tactile 3D CTA Button with Breathing Orange Outer Shadow */}
             <button
               onClick={() => setCurrentStep("layout")}
               className="group relative inline-flex items-center justify-center px-14 py-5 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 border border-orange-300/40 text-white font-black text-xl md:text-2xl tracking-wider animate-breathing-shadow hover:scale-[1.02] active:scale-[0.98] transition-transform duration-300 cursor-pointer overflow-hidden"
             >
-              {/* Glossy Top Sheen Reflection */}
               <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/30 to-transparent rounded-t-full pointer-events-none" />
               <span className="relative z-10 font-black text-white">Capture</span>
             </button>
@@ -366,7 +381,6 @@ export default function PhotoboothStateMachine() {
               Select the number of poses for your photo strip template to begin your photo session.
             </p>
 
-            {/* 3 Clickable Layout Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl">
               {PHOTO_LAYOUTS.map((layout) => (
                 <button
@@ -374,7 +388,6 @@ export default function PhotoboothStateMachine() {
                   onClick={() => handleSelectLayout(layout)}
                   className="group relative flex flex-col items-center justify-between p-6 rounded-3xl bg-neutral-900/80 border border-white/10 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:bg-neutral-900/90 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                 >
-                  {/* Card Visual Wireframe */}
                   <div className="w-full py-6 flex items-center justify-center bg-black/40 rounded-2xl border border-white/5 mb-4 group-hover:border-orange-500/30 transition-colors">
                     <div className="w-14 flex flex-col gap-1.5 p-2 rounded-lg bg-neutral-800 border border-neutral-700">
                       {Array.from({ length: layout.poseCount }).map((_, i) => (
@@ -388,7 +401,6 @@ export default function PhotoboothStateMachine() {
                     </div>
                   </div>
 
-                  {/* Card Details */}
                   <div className="text-center w-full">
                     <h3 className="text-xl font-bold text-white mb-1 group-hover:text-orange-500 transition-colors">
                       {layout.name}
@@ -407,10 +419,10 @@ export default function PhotoboothStateMachine() {
           </div>
         )}
 
-        {/* SCREEN 3: CAMERA FEED & AUTOMATED INTERVAL CAPTURE */}
+        {/* SCREEN 3: OVERHAULED CAMERA VIEW */}
         {currentStep === "camera" && (
           <div className="w-full flex flex-col items-center text-center animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* Header / Selected Layout Info */}
+            {/* Header Info */}
             <div className="flex items-center gap-3 mb-4">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-500 text-xs font-semibold">
                 <Sparkles className="w-3.5 h-3.5 text-orange-500" />
@@ -418,14 +430,85 @@ export default function PhotoboothStateMachine() {
               </div>
             </div>
 
-            {/* Webcam Feed Container */}
-            <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-neutral-900 border border-white/10 mb-6">
-              {/* React Webcam Component */}
+            {/* TOP CONTROL BAR (Above Video Feed) */}
+            <div className="w-full flex items-center justify-center gap-3 sm:gap-4 mb-4 flex-wrap z-10">
+              {/* Camera Device Select */}
+              <select
+                value={selectedDeviceId || facingMode}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "user" || val === "environment") {
+                    setSelectedDeviceId("");
+                    setFacingMode(val as "user" | "environment");
+                  } else {
+                    setSelectedDeviceId(val);
+                  }
+                }}
+                disabled={isCapturing}
+                className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {devices.length > 0 ? (
+                  devices.map((device, idx) => (
+                    <option key={device.deviceId || idx} value={device.deviceId}>
+                      {device.label || `Camera ${idx + 1}`}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="user">User Facing</option>
+                    <option value="environment">Rear Facing</option>
+                  </>
+                )}
+              </select>
+
+              {/* Upload Image Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isCapturing}
+                className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <UploadCloud className="w-4 h-4 text-slate-700" />
+                <span>Upload Image</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+
+              {/* Timer Select */}
+              <select
+                value={timerDuration}
+                onChange={(e) => setTimerDuration(Number(e.target.value))}
+                disabled={isCapturing}
+                className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value={3}>3s</option>
+                <option value={5}>5s</option>
+                <option value={10}>10s</option>
+              </select>
+            </div>
+
+            {/* RELATIVE VIDEO CONTAINER */}
+            <div
+              ref={videoContainerRef}
+              className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-neutral-900 border border-white/10 mb-4 group"
+            >
+              {/* Webcam Component */}
               <Webcam
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: "user", aspectRatio: 3 / 4 }}
+                videoConstraints={
+                  selectedDeviceId
+                    ? { deviceId: selectedDeviceId, aspectRatio: 3 / 4 }
+                    : { facingMode, aspectRatio: 3 / 4 }
+                }
+                onUserMedia={handleUserMedia}
+                mirrored={isMirrored}
                 style={{
                   width: "100%",
                   height: "100%",
@@ -458,69 +541,82 @@ export default function PhotoboothStateMachine() {
                 <span className={`w-2 h-2 rounded-full ${isCapturing ? "bg-orange-500 animate-ping" : "bg-emerald-400"}`} />
                 <span>Poses: {capturedImages.length} / {targetPoses}</span>
               </div>
+
+              {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                title="Toggle Fullscreen"
+                className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-4 h-4 text-slate-800" />
+                ) : (
+                  <Maximize2 className="w-4 h-4 text-slate-800" />
+                )}
+                <span>Fullscreen</span>
+              </button>
             </div>
 
-            {/* Controls Row */}
-            <div className="flex flex-wrap justify-center items-center gap-3 px-4 w-full mb-6">
-              {/* Conditional Button: Start Capture vs Download Photo Strip */}
+            {/* BOTTOM CONTROL BAR (Below Video Feed) */}
+            <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
+              {/* Mirror Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setIsMirrored((prev) => !prev)}
+                className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
+              >
+                <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+              </button>
+
+              {/* Start / Download Button */}
               {capturedImages.length < targetPoses ? (
                 <button
+                  type="button"
                   onClick={handleStartCapture}
                   disabled={isCapturing}
-                  className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold text-lg shadow-[0_0_25px_rgba(249,115,22,0.4)] hover:shadow-[0_0_35px_rgba(249,115,22,0.65)] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-8 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isCapturing ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Capturing Poses...</span>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Capturing...</span>
                     </>
                   ) : (
                     <>
-                      <Play className="w-5 h-5 fill-current" />
-                      <span>{capturedImages.length > 0 ? "Retake Photos" : "Start Capture"}</span>
+                      <Camera className="w-4 h-4" />
+                      <span>START</span>
                     </>
                   )}
                 </button>
               ) : (
-                /* Download Photo Strip Button (Replaces Start button when all poses captured) */
                 <button
+                  type="button"
                   onClick={handleDownload}
                   disabled={isGenerating}
-                  className="group relative inline-flex items-center justify-center gap-3 px-9 py-4 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-bold text-lg shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_40px_rgba(16,185,129,0.65)] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50"
+                  className="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold rounded-full px-8 py-3 shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Generating Strip...</span>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Generating...</span>
                     </>
                   ) : (
                     <>
-                      <Download className="w-6 h-6 animate-bounce" />
-                      <span>Download Photo Strip</span>
+                      <Download className="w-4 h-4" />
+                      <span>Download Strip</span>
                     </>
                   )}
                 </button>
               )}
 
-              {/* Retake Session Option when complete */}
-              {capturedImages.length === targetPoses && (
-                <button
-                  onClick={handleStartCapture}
-                  className="inline-flex items-center gap-2 px-5 py-4 rounded-full bg-neutral-900 border border-white/15 text-neutral-300 hover:text-white hover:bg-neutral-800 font-semibold text-sm transition-all duration-200 cursor-pointer"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Retake</span>
-                </button>
-              )}
-
-              {/* Back to Layouts Button */}
+              {/* Flash Toggle Button */}
               <button
-                onClick={handleBack}
-                disabled={isCapturing}
-                className="inline-flex items-center gap-2 px-6 py-4 rounded-full bg-neutral-900 border border-white/15 text-neutral-200 hover:text-white hover:bg-neutral-800 hover:border-white/30 font-semibold text-sm transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={() => setIsFlashOn((prev) => !prev)}
+                className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Back to Layouts</span>
+                <span>Flash: {isFlashOn ? "On" : "Off"}</span>
               </button>
             </div>
 

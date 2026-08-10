@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Webcam from "react-webcam";
 import LayoutSelector from "@/components/LayoutSelector";
-import PhotoboothControls from "@/components/PhotoboothControls";
 import {
   FacingMode,
   TimerDuration,
@@ -21,6 +20,9 @@ import {
   Loader2,
   CameraOff,
   Square,
+  UploadCloud,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 export default function CameraFeed() {
@@ -32,6 +34,11 @@ export default function CameraFeed() {
   const [timerDuration, setTimerDuration] = useState<TimerDuration>(3);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+
+  // New Required States
+  const [isMirrored, setIsMirrored] = useState<boolean>(false);
+  const [isFlashOn, setIsFlashOn] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const [isCameraReady, setIsCameraReady] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -45,6 +52,9 @@ export default function CameraFeed() {
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
 
   const webcamRef = useRef<Webcam>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const activeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -53,16 +63,16 @@ export default function CameraFeed() {
     if (selectedDeviceId && selectedDeviceId.trim() !== "") {
       return {
         deviceId: selectedDeviceId,
-        aspectRatio: 3 / 4,
+        aspectRatio: 4 / 3,
         width: { ideal: 1280 },
-        height: { ideal: 720 },
+        height: { ideal: 960 },
       };
     }
     return {
       facingMode: facingMode,
-      aspectRatio: 3 / 4,
+      aspectRatio: 4 / 3,
       width: { ideal: 1280 },
-      height: { ideal: 720 },
+      height: { ideal: 960 },
     };
   }, [facingMode, selectedDeviceId]);
 
@@ -72,7 +82,6 @@ export default function CameraFeed() {
     setHasError(false);
     setErrorMessage("");
 
-    // Enumerate video devices AFTER permission is granted
     if (typeof window !== "undefined" && navigator.mediaDevices?.enumerateDevices) {
       navigator.mediaDevices
         .enumerateDevices()
@@ -104,16 +113,34 @@ export default function CameraFeed() {
     setErrorMessage(msg);
   }, []);
 
-  // Handle switching facing mode
-  const handleFacingModeChange = (mode: FacingMode) => {
-    setSelectedDeviceId("");
-    setFacingMode(mode);
+  // Fullscreen Toggle Handler
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      containerRef.current
+        .requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch((err) => console.error("Fullscreen error:", err));
+    } else {
+      document
+        .exitFullscreen()
+        .then(() => setIsFullscreen(false))
+        .catch((err) => console.error("Exit fullscreen error:", err));
+    }
   };
 
-  // Handle selecting a specific device ID
-  const handleDeviceSelect = (deviceId: string) => {
-    setSelectedDeviceId(deviceId);
-  };
+  // Fullscreen Change Listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -123,16 +150,36 @@ export default function CameraFeed() {
     };
   }, []);
 
+  // Image Upload Handler
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          const poseIdx = capturedPhotos.length;
+          const newPhoto: CapturedPhoto = {
+            id: `upload-${Date.now()}-${poseIdx}`,
+            poseIndex: poseIdx,
+            dataUrl,
+            timestamp: Date.now(),
+          };
+          setCapturedPhotos((prev) => [...prev, newPhoto]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Flash & Take Snapshot Logic
   const capturePhoto = (poseIndex: number) => {
-    setIsFlashing(true);
-    setTimeout(() => setIsFlashing(false), 250);
+    if (isFlashOn) {
+      setIsFlashing(true);
+      setTimeout(() => setIsFlashing(false), 250);
+    }
 
     const imageSrc = webcamRef.current?.getScreenshot();
-    console.log(
-      `📸 FLASH! Photo taken for pose #${poseIndex + 1}`,
-      imageSrc ? "[Captured]" : "[Simulated]"
-    );
 
     const newPhoto: CapturedPhoto = {
       id: `photo-${Date.now()}-${poseIndex}`,
@@ -202,12 +249,12 @@ export default function CameraFeed() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-neutral-950 text-white p-3 sm:p-6 flex flex-col justify-between gap-4 max-w-5xl mx-auto selection:bg-indigo-500/30">
+    <div className="min-h-screen w-full bg-neutral-950 text-white p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto selection:bg-orange-500/30">
       {/* Top Header & Layout Selector */}
       <header className="w-full flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-400">
+            <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-orange-400">
               <Camera className="w-5 h-5" />
             </div>
             <div>
@@ -215,14 +262,14 @@ export default function CameraFeed() {
                 Web Photobooth
               </h1>
               <p className="text-xs text-neutral-400 hidden sm:block">
-                Select a layout, set the countdown timer, and snap your photos.
+                Select a layout, set the timer, and snap your photos.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-xs font-medium">
-              Local-First
+            <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
+              Live Feed
             </span>
           </div>
         </div>
@@ -233,25 +280,77 @@ export default function CameraFeed() {
           onSelectLayout={handleLayoutChange}
           disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
         />
-
-        {/* Dropdown Controls Bar */}
-        <PhotoboothControls
-          facingMode={facingMode}
-          onFacingModeChange={handleFacingModeChange}
-          timerDuration={timerDuration}
-          onTimerChange={setTimerDuration}
-          devices={devices}
-          selectedDeviceId={selectedDeviceId}
-          onDeviceSelect={handleDeviceSelect}
-          photosTaken={capturedPhotos.length}
-          totalPoses={selectedLayout.poseCount}
-          disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-        />
       </header>
 
-      {/* Main Camera Feed Viewport Container */}
-      <main className="w-full flex-1 flex items-center justify-center my-2">
-        <div className="relative w-full aspect-[4/3] max-w-3xl bg-black overflow-hidden rounded-xl border border-white/15 shadow-2xl flex items-center justify-center">
+      {/* Main Viewport Section */}
+      <main className="w-full flex-1 flex flex-col items-center justify-center my-2">
+        {/* TOP CONTROL BAR (Above Video Feed) */}
+        <div className="w-full flex items-center justify-center gap-3 sm:gap-4 mb-4 flex-wrap z-10">
+          {/* Camera Device Select */}
+          <select
+            value={selectedDeviceId || facingMode}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "user" || val === "environment") {
+                setSelectedDeviceId("");
+                setFacingMode(val as FacingMode);
+              } else {
+                setSelectedDeviceId(val);
+              }
+            }}
+            disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
+            className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {devices.length > 0 ? (
+              devices.map((device, idx) => (
+                <option key={device.deviceId || idx} value={device.deviceId}>
+                  {device.label || `Camera ${idx + 1}`}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="user">User Facing</option>
+                <option value="environment">Rear Facing</option>
+              </>
+            )}
+          </select>
+
+          {/* Upload Image Button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
+            className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <UploadCloud className="w-4 h-4 text-slate-700" />
+            <span>Upload Image</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+
+          {/* Timer Select */}
+          <select
+            value={timerDuration}
+            onChange={(e) => setTimerDuration(Number(e.target.value) as TimerDuration)}
+            disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
+            className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value={3}>3s</option>
+            <option value={5}>5s</option>
+            <option value={10}>10s</option>
+          </select>
+        </div>
+
+        {/* RELATIVE VIDEO CONTAINER */}
+        <div
+          ref={containerRef}
+          className="relative w-full max-w-3xl aspect-[4/3] bg-black overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
+        >
           {/* White Flash Effect Overlay */}
           <div
             className={`absolute inset-0 bg-white z-40 pointer-events-none transition-opacity duration-150 ${
@@ -267,6 +366,7 @@ export default function CameraFeed() {
             videoConstraints={videoConstraints}
             onUserMedia={handleUserMedia}
             onUserMediaError={handleUserMediaError}
+            mirrored={isMirrored}
             style={{
               position: "absolute",
               top: 0,
@@ -275,15 +375,12 @@ export default function CameraFeed() {
               height: "100%",
               objectFit: "cover",
             }}
-            className={`transition-transform duration-300 ${
-              facingMode === "user" && !selectedDeviceId ? "scale-x-[-1]" : "scale-x-1"
-            }`}
           />
 
           {/* Loading Overlay */}
           {!isCameraReady && !hasError && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm p-6 text-center">
-              <Loader2 className="w-10 h-10 text-indigo-400 animate-spin mb-3" />
+              <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-3" />
               <p className="text-sm font-semibold text-white">Initializing Camera...</p>
             </div>
           )}
@@ -307,14 +404,14 @@ export default function CameraFeed() {
           {sessionStatus === "countdown" && currentCountdown !== null && (
             <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
               <div className="relative flex items-center justify-center">
-                <div className="absolute w-36 h-36 rounded-full bg-indigo-500/30 animate-ping" />
+                <div className="absolute w-36 h-36 rounded-full bg-orange-500/30 animate-ping" />
                 <div className="w-28 h-28 rounded-full bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
                   <span className="text-6xl font-black text-white tracking-tighter animate-pulse">
                     {currentCountdown}
                   </span>
                 </div>
               </div>
-              <div className="mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs font-semibold text-amber-300">
+              <div className="mt-4 px-4 py-1.5 rounded-full bg-black/60 border border-white/10 text-xs font-semibold text-orange-400">
                 Get ready for Pose #{currentPoseIndex + 1}!
               </div>
             </div>
@@ -323,7 +420,7 @@ export default function CameraFeed() {
           {/* Pause Between Poses Overlay */}
           {sessionStatus === "capturing" && (
             <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
-              <div className="px-5 py-2.5 rounded-2xl bg-indigo-600 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
+              <div className="px-5 py-2.5 rounded-2xl bg-orange-500 text-white font-bold text-sm tracking-wide shadow-xl animate-bounce flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
                 <span>Pose #{currentPoseIndex + 1} Captured! Next coming up...</span>
               </div>
@@ -337,6 +434,58 @@ export default function CameraFeed() {
               <span>All {selectedLayout.poseCount} Poses Captured!</span>
             </div>
           )}
+
+          {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title="Toggle Fullscreen"
+            className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="w-4 h-4 text-slate-800" />
+            ) : (
+              <Maximize2 className="w-4 h-4 text-slate-800" />
+            )}
+            <span>Fullscreen</span>
+          </button>
+        </div>
+
+        {/* BOTTOM CONTROL BAR (Below Video Feed) */}
+        <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap">
+          {/* Mirror Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsMirrored((prev) => !prev)}
+            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
+          >
+            <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+          </button>
+
+          {/* Start Button */}
+          <button
+            type="button"
+            onClick={startSequence}
+            disabled={
+              !isCameraReady ||
+              hasError ||
+              sessionStatus === "countdown" ||
+              sessionStatus === "capturing"
+            }
+            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-8 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Camera className="w-4 h-4" />
+            <span>START</span>
+          </button>
+
+          {/* Flash Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsFlashOn((prev) => !prev)}
+            className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
+          >
+            <span>Flash: {isFlashOn ? "On" : "Off"}</span>
+          </button>
         </div>
       </main>
 
@@ -352,7 +501,7 @@ export default function CameraFeed() {
                 captured
                   ? "border-emerald-500 shadow-md shadow-emerald-500/10"
                   : idx === currentPoseIndex && sessionStatus === "countdown"
-                  ? "border-indigo-500 animate-pulse"
+                  ? "border-orange-500 animate-pulse"
                   : "border-white/10"
               }`}
             >
@@ -374,34 +523,13 @@ export default function CameraFeed() {
         })}
       </div>
 
-      {/* Control Action Buttons Row Below Camera */}
-      <footer className="w-full max-w-3xl mx-auto flex items-center justify-center gap-4 py-2">
-        {sessionStatus === "idle" && (
-          <button
-            onClick={startSequence}
-            disabled={!isCameraReady || hasError}
-            className="flex-1 max-w-xs flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-sm tracking-wide shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Play className="w-5 h-5 fill-current" />
-            <span>Start Session</span>
-          </button>
-        )}
-
-        {(sessionStatus === "countdown" || sessionStatus === "capturing") && (
-          <button
-            onClick={resetSession}
-            className="flex-1 max-w-xs flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-sm tracking-wide shadow-xl shadow-red-600/20 transition-all"
-          >
-            <Square className="w-4 h-4 fill-current" />
-            <span>Cancel Sequence</span>
-          </button>
-        )}
-
-        {sessionStatus === "completed" && (
+      {/* Footer Action Buttons when completed */}
+      {sessionStatus === "completed" && (
+        <footer className="w-full max-w-3xl mx-auto flex items-center justify-center gap-4 py-2">
           <div className="flex items-center gap-3 w-full max-w-md justify-center">
             <button
               onClick={resetSession}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white font-semibold text-sm border border-white/10 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-white font-semibold text-sm border border-white/10 transition-all cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Retake Photos</span>
@@ -409,14 +537,14 @@ export default function CameraFeed() {
 
             <button
               onClick={startSequence}
-              className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-sm transition-all shadow-lg"
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold text-sm transition-all shadow-lg cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>Start New Session</span>
             </button>
           </div>
-        )}
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }
