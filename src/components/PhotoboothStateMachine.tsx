@@ -340,18 +340,18 @@ export default function PhotoboothStateMachine() {
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4">
               Capture Your <span className="text-[#FF6B00] drop-shadow-[0_2px_12px_rgba(255,107,0,0.4)]">Best Moments</span>
             </h1>
-            <p className="text-white/90 text-base md:text-lg max-w-md mb-10 leading-relaxed font-normal">
+            <p className="font-serif italic text-gray-200 text-lg md:text-xl max-w-md mb-10 leading-relaxed font-normal">
               Step right up! Choose your custom layout, strike your best poses, and create timeless photo strips.
             </p>
 
-            {/* Glossy 3D CTA Button (Ref image_9.png) */}
+            {/* Glossy 3D CTA Button with Continuous Breathing Neon Glow */}
             <button
               onClick={() => setCurrentStep("layout")}
-              className="group relative inline-flex items-center justify-center px-14 py-5 rounded-full bg-gradient-to-b from-[#ea2b61] via-[#c9184a] to-[#990830] border border-pink-300/40 text-white font-black text-xl md:text-2xl tracking-wider shadow-[inset_0_2px_4px_rgba(255,255,255,0.7),inset_0_-3px_6px_rgba(0,0,0,0.4),0_0_35px_rgba(225,29,72,0.65),0_12px_25px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_6px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.4),0_0_50px_rgba(225,29,72,0.9),0_15px_30px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer overflow-hidden"
+              className="group relative inline-flex items-center justify-center px-14 py-5 rounded-full bg-gradient-to-b from-[#ff8800] via-[#ff5500] to-[#d43f00] border border-orange-300/50 text-white font-black text-xl md:text-2xl tracking-wider animate-breathing-glow hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer overflow-hidden"
             >
               {/* Glossy Top Sheen Reflection */}
-              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent rounded-t-full pointer-events-none" />
-              <span className="relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">ENTER -&gt;</span>
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/40 to-transparent rounded-t-full pointer-events-none" />
+              <span className="relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">ENTER -&gt;</span>
             </button>
           </div>
         )}
