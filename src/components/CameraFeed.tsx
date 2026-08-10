@@ -53,12 +53,14 @@ export default function CameraFeed() {
     if (selectedDeviceId && selectedDeviceId.trim() !== "") {
       return {
         deviceId: selectedDeviceId,
+        aspectRatio: 3 / 4,
         width: { ideal: 1280 },
         height: { ideal: 720 },
       };
     }
     return {
       facingMode: facingMode,
+      aspectRatio: 3 / 4,
       width: { ideal: 1280 },
       height: { ideal: 720 },
     };

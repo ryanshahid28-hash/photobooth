@@ -134,7 +134,8 @@ export default function PhotoboothStateMachine() {
     const canvasWidth = 600;
     const padding = 24;
     const photoWidth = canvasWidth - padding * 2; // 552px
-    const photoHeight = 414; // Maintains 4:3 ratio (552 / 1.333)
+    const targetAspectRatio = 3 / 4; // 4:3 Portrait aspect ratio (3 wide : 4 high)
+    const photoHeight = Math.round(photoWidth / targetAspectRatio); // 736px
     const footerHeight = 130;
     const canvasHeight = padding + poseCount * (photoHeight + padding) + footerHeight;
 
@@ -162,8 +163,32 @@ export default function PhotoboothStateMachine() {
         const x = padding;
         const y = padding + i * (photoHeight + padding);
 
-        // Draw photo
-        ctx.drawImage(img, x, y, photoWidth, photoHeight);
+        // Calculate source aspect ratio and simulate object-fit: cover
+        const imgWidth = img.naturalWidth || img.width;
+        const imgHeight = img.naturalHeight || img.height;
+        const imgAspect = imgWidth / imgHeight;
+
+        let sx = 0;
+        let sy = 0;
+        let sWidth = imgWidth;
+        let sHeight = imgHeight;
+
+        if (imgAspect > targetAspectRatio) {
+          // Source image is wider than target slot relative to height -> crop left/right sides
+          sWidth = imgHeight * targetAspectRatio;
+          sHeight = imgHeight;
+          sx = (imgWidth - sWidth) / 2;
+          sy = 0;
+        } else if (imgAspect < targetAspectRatio) {
+          // Source image is taller than target slot relative to width -> crop top/bottom sides
+          sWidth = imgWidth;
+          sHeight = imgWidth / targetAspectRatio;
+          sx = 0;
+          sy = (imgHeight - sHeight) / 2;
+        }
+
+        // Draw cropped photo with 9-parameter drawImage
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWidth, photoHeight);
 
         // Draw subtle photo frame border
         ctx.strokeStyle = "#E5E5E5";
@@ -245,19 +270,49 @@ export default function PhotoboothStateMachine() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-neutral-950 text-white flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-rose-500/30">
+    <div className="relative min-h-screen w-full bg-[#e2e8f0] text-white flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-orange-500/30">
       {/* Hidden HTML5 Canvas for Photo Strip Compositing */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Background Decorative Ambient Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-600/15 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-pink-600/10 blur-[100px] rounded-full pointer-events-none" />
+      {/* Scattered Floating Blurred Background Client Logos at Different Depths */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <img
+          src="/logo.png"
+          alt=""
+          className="absolute top-[6%] left-[4%] w-48 md:w-60 opacity-15 blur-[4px] -rotate-12 select-none"
+        />
+        <img
+          src="/logo.png"
+          alt=""
+          className="absolute top-[12%] right-[6%] w-64 md:w-80 opacity-20 blur-[6px] rotate-45 select-none"
+        />
+        <img
+          src="/logo.png"
+          alt=""
+          className="absolute bottom-[10%] left-[8%] w-56 md:w-72 opacity-10 blur-[8px] -rotate-45 select-none"
+        />
+        <img
+          src="/logo.png"
+          alt=""
+          className="absolute bottom-[18%] right-[10%] w-52 md:w-64 opacity-15 blur-[3px] rotate-12 select-none"
+        />
+        <img
+          src="/logo.png"
+          alt=""
+          className="absolute top-[50%] left-[2%] w-40 md:w-52 opacity-10 blur-[5px] rotate-[160deg] select-none"
+        />
+        <img
+          src="/logo.png"
+          alt=""
+          className="absolute top-[38%] right-[2%] w-44 md:w-56 opacity-20 blur-[7px] -rotate-30 select-none"
+        />
+      </div>
 
-      {/* Main Container */}
-      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center justify-center min-h-[85vh]">
+      {/* Main Glassmorphic Container Layer */}
+      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center justify-center min-h-[85vh] p-6 md:p-12 rounded-3xl bg-neutral-950/65 border border-white/20 backdrop-blur-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)]">
         {/* Step Indicator Header (Visible in Layout & Camera steps) */}
         {currentStep !== "start" && (
-          <div className="w-full flex items-center justify-between mb-6 px-4 py-3 rounded-full bg-neutral-900/60 border border-white/10 backdrop-blur-md transition-all duration-300">
+          <div className="w-full flex items-center justify-between mb-6 px-4 py-3 rounded-full bg-neutral-900/70 border border-white/15 backdrop-blur-md transition-all duration-300">
             <button
               onClick={handleBack}
               disabled={isCapturing}
@@ -266,7 +321,7 @@ export default function PhotoboothStateMachine() {
               <ArrowLeft className="w-4 h-4" />
               {currentStep === "camera" ? "Back to Layouts" : "Back to Home"}
             </button>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-rose-400">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-400">
               <Sparkles className="w-4 h-4" />
               <span>Step {currentStep === "layout" ? "1 of 2" : "2 of 2"}</span>
             </div>
@@ -277,27 +332,26 @@ export default function PhotoboothStateMachine() {
         {currentStep === "start" && (
           <div className="w-full flex flex-col items-center justify-center text-center py-12 px-6 animate-in fade-in zoom-in-95 duration-300">
             {/* Logo / Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm font-semibold tracking-wide mb-6">
-              <Sparkles className="w-4 h-4" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-white text-sm font-semibold tracking-wide mb-6">
+              <Sparkles className="w-4 h-4 text-orange-400" />
               <span>Digital Photobooth</span>
             </div>
 
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4">
-              Capture Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-pink-500">Best Moments</span>
+              Capture Your <span className="text-[#FF6B00] drop-shadow-[0_2px_12px_rgba(255,107,0,0.4)]">Best Moments</span>
             </h1>
-            <p className="text-neutral-400 text-base md:text-lg max-w-md mb-10 leading-relaxed">
+            <p className="text-white/90 text-base md:text-lg max-w-md mb-10 leading-relaxed font-normal">
               Step right up! Choose your custom layout, strike your best poses, and create timeless photo strips.
             </p>
 
-            {/* Large Pill-Shaped Button */}
+            {/* Glossy 3D CTA Button (Ref image_9.png) */}
             <button
               onClick={() => setCurrentStep("layout")}
-              className="group relative inline-flex items-center justify-center gap-3 px-10 py-5 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 text-white font-bold text-lg md:text-xl shadow-[0_0_30px_rgba(244,63,94,0.4)] hover:shadow-[0_0_45px_rgba(244,63,94,0.65)] hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
+              className="group relative inline-flex items-center justify-center px-14 py-5 rounded-full bg-gradient-to-b from-[#ea2b61] via-[#c9184a] to-[#990830] border border-pink-300/40 text-white font-black text-xl md:text-2xl tracking-wider shadow-[inset_0_2px_4px_rgba(255,255,255,0.7),inset_0_-3px_6px_rgba(0,0,0,0.4),0_0_35px_rgba(225,29,72,0.65),0_12px_25px_rgba(0,0,0,0.25)] hover:shadow-[inset_0_2px_6px_rgba(255,255,255,0.9),inset_0_-3px_6px_rgba(0,0,0,0.4),0_0_50px_rgba(225,29,72,0.9),0_15px_30px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer overflow-hidden"
             >
-              <div className="p-2 rounded-full bg-white/20 text-white group-hover:rotate-12 transition-transform duration-300">
-                <Camera className="w-6 h-6 fill-current" />
-              </div>
-              <span>Start the Booth</span>
+              {/* Glossy Top Sheen Reflection */}
+              <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent rounded-t-full pointer-events-none" />
+              <span className="relative z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">ENTER -&gt;</span>
             </button>
           </div>
         )}
@@ -365,13 +419,13 @@ export default function PhotoboothStateMachine() {
             </div>
 
             {/* Webcam Feed Container */}
-            <div className="relative w-full max-w-2xl aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl bg-neutral-900 border border-white/10 mb-6">
+            <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden shadow-2xl bg-neutral-900 border border-white/10 mb-6">
               {/* React Webcam Component */}
               <Webcam
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={{ facingMode: "user" }}
+                videoConstraints={{ facingMode: "user", aspectRatio: 3 / 4 }}
                 style={{
                   width: "100%",
                   height: "100%",
@@ -487,7 +541,7 @@ export default function PhotoboothStateMachine() {
                   return (
                     <div
                       key={idx}
-                      className={`relative aspect-[4/3] rounded-xl overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
+                      className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
                         img
                           ? "border-rose-500 shadow-md shadow-rose-500/20 bg-black"
                           : "border-white/10 bg-black/40 border-dashed"
