@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import Webcam from "react-webcam";
-import LayoutSelector from "@/components/LayoutSelector";
 import {
   FacingMode,
   TimerDuration,
@@ -282,26 +281,26 @@ export default function CameraFeed({
   };
 
   return (
-    <div className="min-h-screen w-full bg-zinc-800 text-white p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto selection:bg-orange-500/30">
+    <div className="w-full bg-[#cbd5e1] text-slate-800 p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto selection:bg-orange-500/30">
       {/* Top Header */}
       <header className="w-full flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-orange-400">
+            <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-orange-600">
               <Camera className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-neutral-200 to-neutral-400 bg-clip-text text-transparent">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
                 Web Photobooth
               </h1>
-              <p className="text-xs text-neutral-400 hidden sm:block">
+              <p className="text-xs text-slate-600 hidden sm:block">
                 Set the timer and snap your photos.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
+            <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-600 text-xs font-semibold">
               {isComplete ? `Captured (${capturedPhotos.length}/${selectedLayout.poseCount})` : "Live Feed"}
             </span>
           </div>
@@ -325,7 +324,7 @@ export default function CameraFeed({
                 }
               }}
               disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-              className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-white text-slate-800 border border-slate-300 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-400 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {devices.length > 0 ? (
                 devices.map((device, idx) => (
@@ -345,7 +344,7 @@ export default function CameraFeed({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-              className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <UploadCloud className="w-4 h-4 text-slate-700" />
               <span>Upload Image</span>
@@ -362,7 +361,7 @@ export default function CameraFeed({
               value={timerDuration}
               onChange={(e) => setTimerDuration(Number(e.target.value) as TimerDuration)}
               disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-              className="bg-white text-slate-800 border border-slate-200 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-white text-slate-800 border border-slate-300 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-400 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value={3}>3s</option>
               <option value={5}>5s</option>
@@ -374,7 +373,7 @@ export default function CameraFeed({
         {/* CAMERA VIEWPORT CONTAINER */}
         <div
           ref={containerRef}
-          className="relative w-full max-w-3xl aspect-[4/3] bg-zinc-700 overflow-hidden rounded-3xl border border-white/15 shadow-2xl flex items-center justify-center group"
+          className="relative w-full max-w-3xl aspect-[4/3] bg-slate-300 overflow-hidden rounded-3xl border border-slate-400/40 shadow-xl flex items-center justify-center group"
         >
           {/* White Flash Effect Overlay */}
           <div
