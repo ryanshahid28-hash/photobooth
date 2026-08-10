@@ -30,15 +30,34 @@ import {
   FileImage,
 } from "lucide-react";
 
-export default function CameraFeed() {
+export interface CameraFeedProps {
+  selectedLayout?: PhotoboothLayout;
+  onSelectLayout?: (layout: PhotoboothLayout) => void;
+  onComplete?: (images: string[]) => void;
+  onBack?: () => void;
+}
+
+export default function CameraFeed({
+  selectedLayout: propLayout,
+  onSelectLayout: propOnSelectLayout,
+  onComplete,
+  onBack,
+}: CameraFeedProps = {}) {
   // State Manager
   const [selectedLayout, setSelectedLayout] = useState<PhotoboothLayout>(
-    LAYOUT_OPTIONS[0]
+    propLayout || LAYOUT_OPTIONS[0]
   );
   const [facingMode, setFacingMode] = useState<FacingMode>("user");
   const [timerDuration, setTimerDuration] = useState<TimerDuration>(3);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+
+  // Update selectedLayout if propLayout changes
+  useEffect(() => {
+    if (propLayout) {
+      setSelectedLayout(propLayout);
+    }
+  }, [propLayout]);
 
   // Controls States
   const [isMirrored, setIsMirrored] = useState<boolean>(false);
@@ -142,7 +161,7 @@ export default function CameraFeed() {
     setErrorMessage(msg);
   }, []);
 
-  // Generate Photo Strip Composited Image for Printer Slot Preview & Download
+  // Generate Photo Strip Canvas
   const generatePhotoStripCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
     if (capturedPhotos.length === 0) return null;
 
@@ -388,8 +407,14 @@ export default function CameraFeed() {
     setPreviewDataUrl(null);
   };
 
-  // Download Handler for PNG
-  const handleDownloadPNG = async () => {
+  // DONE Button Handler: Lifts final photo array up to parent if onComplete is provided, or downloads canvas
+  const handleDone = async () => {
+    const images = capturedPhotos.map((p) => p.dataUrl);
+    if (onComplete) {
+      onComplete(images);
+      return;
+    }
+
     try {
       setIsDownloading(true);
       const canvas = await generatePhotoStripCanvas();
@@ -438,6 +463,7 @@ export default function CameraFeed() {
 
   const handleLayoutChange = (layout: PhotoboothLayout) => {
     setSelectedLayout(layout);
+    if (propOnSelectLayout) propOnSelectLayout(layout);
     handleRetake();
   };
 
@@ -546,7 +572,6 @@ export default function CameraFeed() {
             {/* PRINTER HARDWARE (TOP CONTAINER - z-20) */}
             <div className="w-full bg-zinc-800 rounded-3xl p-4 sm:p-5 relative shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-3px_6px_rgba(0,0,0,0.6)] border border-zinc-700/50 z-20">
               <div className="flex items-center justify-between px-2">
-                {/* Dynamic Printer Feedback: Printing... with blinking green LED vs Ready ✦ with static yellow LED */}
                 <span className="text-white font-serif italic text-sm sm:text-base tracking-wide flex items-center gap-1.5">
                   {isPrinting ? "Printing..." : "Ready ✦"}
                 </span>
@@ -560,7 +585,6 @@ export default function CameraFeed() {
                 />
               </div>
 
-              {/* Exit Slot: Dark horizontal div at bottom of printer hardware */}
               <div className="w-full h-2.5 bg-zinc-950 rounded-full border border-black/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] mt-4 overflow-hidden" />
             </div>
 
@@ -598,20 +622,31 @@ export default function CameraFeed() {
               </h2>
             </div>
 
-            {/* ACTION BUTTONS (VERTICAL FLEX STACK) */}
+            {/* CONTROL BAR SWAP / ACTION BUTTONS */}
             <div className="flex flex-col gap-3 w-full max-w-xs sm:max-w-sm mx-auto mt-6">
+              {/* DONE Button (Outlined style: border border-orange-500 text-orange-500) -> lifts photos array to parent onComplete */}
+              <button
+                type="button"
+                onClick={handleDone}
+                disabled={isDownloading}
+                className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 font-bold py-3.5 px-6 rounded-2xl transition-all cursor-pointer w-full text-base flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 shadow-sm"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                ) : (
+                  <Download className="w-5 h-5 text-orange-500" />
+                )}
+                <span>DONE / Continue to Preview</span>
+              </button>
+
               {/* 1. Download PNG: Solid orange fill */}
               <button
                 type="button"
-                onClick={handleDownloadPNG}
+                onClick={handleDone}
                 disabled={isDownloading}
                 className="bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all w-full text-base disabled:opacity-50"
               >
-                {isDownloading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-white" />
-                ) : (
-                  <Download className="w-5 h-5 text-white" />
-                )}
+                <Download className="w-5 h-5 text-white" />
                 <span>Download PNG</span>
               </button>
 
@@ -619,7 +654,7 @@ export default function CameraFeed() {
               <div className="flex items-center gap-3 w-full">
                 <button
                   type="button"
-                  onClick={handleDownloadPNG}
+                  onClick={handleDone}
                   className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
                 >
                   <FileImage className="w-4 h-4 text-orange-500" />
@@ -628,7 +663,7 @@ export default function CameraFeed() {
 
                 <button
                   type="button"
-                  onClick={handleDownloadPNG}
+                  onClick={handleDone}
                   className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
                 >
                   <Film className="w-4 h-4 text-orange-500" />
