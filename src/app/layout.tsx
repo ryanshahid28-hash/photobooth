@@ -37,9 +37,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} min-h-screen bg-neutral-950 text-white antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} min-h-screen bg-zinc-900 text-white antialiased`}
     >
-      <body className="min-h-screen bg-neutral-950 text-white selection:bg-indigo-500/30">
+      <body className="min-h-screen bg-zinc-900 text-white selection:bg-orange-500/30">
         {children}
       </body>
     </html>

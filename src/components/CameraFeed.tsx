@@ -274,33 +274,27 @@ export default function CameraFeed({
     }
   };
 
-  const handleLayoutChange = (layout: PhotoboothLayout) => {
-    setSelectedLayout(layout);
-    if (propOnSelectLayout) propOnSelectLayout(layout);
-    handleRetake();
-  };
-
   return (
-    <div className="w-full bg-[#cbd5e1] text-slate-800 p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto selection:bg-orange-500/30">
+    <div className="w-full bg-zinc-700 text-white p-3 sm:p-6 flex flex-col items-center justify-between gap-4 max-w-5xl mx-auto rounded-3xl selection:bg-orange-500/30">
       {/* Top Header */}
       <header className="w-full flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-orange-600">
+            <div className="p-2 rounded-xl bg-orange-500/20 border border-orange-500/30 text-orange-400">
               <Camera className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
                 Web Photobooth
               </h1>
-              <p className="text-xs text-slate-600 hidden sm:block">
+              <p className="text-xs text-zinc-300 hidden sm:block">
                 Set the timer and snap your photos.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-600 text-xs font-semibold">
+            <span className="px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold">
               {isComplete ? `Captured (${capturedPhotos.length}/${selectedLayout.poseCount})` : "Live Feed"}
             </span>
           </div>
@@ -324,18 +318,18 @@ export default function CameraFeed({
                 }
               }}
               disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-              className="bg-white text-slate-800 border border-slate-300 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-400 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-zinc-800 text-white border border-zinc-600 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-zinc-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {devices.length > 0 ? (
                 devices.map((device, idx) => (
-                  <option key={device.deviceId || idx} value={device.deviceId}>
+                  <option key={device.deviceId || idx} value={device.deviceId} className="bg-zinc-800 text-white">
                     {device.label || `Camera ${idx + 1}`}
                   </option>
                 ))
               ) : (
                 <>
-                  <option value="user">User Facing</option>
-                  <option value="environment">Rear Facing</option>
+                  <option value="user" className="bg-zinc-800 text-white">User Facing</option>
+                  <option value="environment" className="bg-zinc-800 text-white">Rear Facing</option>
                 </>
               )}
             </select>
@@ -344,9 +338,9 @@ export default function CameraFeed({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-              className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-zinc-800 hover:bg-zinc-750 text-white border border-zinc-600 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <UploadCloud className="w-4 h-4 text-slate-700" />
+              <UploadCloud className="w-4 h-4 text-zinc-300" />
               <span>Upload Image</span>
             </button>
             <input
@@ -361,11 +355,11 @@ export default function CameraFeed({
               value={timerDuration}
               onChange={(e) => setTimerDuration(Number(e.target.value) as TimerDuration)}
               disabled={sessionStatus !== "idle" && sessionStatus !== "completed"}
-              className="bg-white text-slate-800 border border-slate-300 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-slate-400 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-zinc-800 text-white border border-zinc-600 shadow-sm rounded-xl px-3.5 py-2 text-sm font-semibold outline-none hover:border-zinc-500 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value={3}>3s</option>
-              <option value={5}>5s</option>
-              <option value={10}>10s</option>
+              <option value={3} className="bg-zinc-800 text-white">3s</option>
+              <option value={5} className="bg-zinc-800 text-white">5s</option>
+              <option value={10} className="bg-zinc-800 text-white">10s</option>
             </select>
           </div>
         )}
@@ -373,7 +367,7 @@ export default function CameraFeed({
         {/* CAMERA VIEWPORT CONTAINER */}
         <div
           ref={containerRef}
-          className="relative w-full max-w-3xl aspect-[4/3] bg-slate-300 overflow-hidden rounded-3xl border border-slate-400/40 shadow-xl flex items-center justify-center group"
+          className="relative w-full max-w-3xl aspect-[4/3] bg-zinc-900 overflow-hidden rounded-3xl border border-zinc-600/50 shadow-2xl flex items-center justify-center group"
         >
           {/* White Flash Effect Overlay */}
           <div
@@ -403,7 +397,7 @@ export default function CameraFeed({
 
           {/* Loading Overlay */}
           {!isCameraReady && !hasError && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-800/90 backdrop-blur-sm p-6 text-center">
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-900/90 backdrop-blur-sm p-6 text-center">
               <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-3" />
               <p className="text-sm font-semibold text-white">Initializing Camera...</p>
             </div>
@@ -411,13 +405,13 @@ export default function CameraFeed({
 
           {/* Error Overlay */}
           {hasError && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-800/95 p-6 text-center">
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-900/95 p-6 text-center">
               <CameraOff className="w-12 h-12 text-red-400 mb-3" />
               <h3 className="text-base font-bold text-white mb-1">Camera Unavailable</h3>
-              <p className="text-xs text-neutral-400 max-w-xs mb-4">{errorMessage}</p>
+              <p className="text-xs text-zinc-400 max-w-xs mb-4">{errorMessage}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 rounded-xl bg-white text-slate-800 font-semibold text-xs hover:bg-neutral-200"
+                className="px-4 py-2 rounded-xl bg-white text-zinc-800 font-semibold text-xs hover:bg-neutral-200"
               >
                 Reload Page
               </button>
@@ -426,16 +420,16 @@ export default function CameraFeed({
 
           {/* Visual Countdown Overlay */}
           {sessionStatus === "countdown" && currentCountdown !== null && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
               <div className="relative flex items-center justify-center">
                 <div className="absolute w-36 h-36 rounded-full bg-orange-500/30 animate-ping" />
-                <div className="w-28 h-28 rounded-full bg-slate-900/80 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
+                <div className="w-28 h-28 rounded-full bg-zinc-900/90 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl">
                   <span className="text-6xl font-black text-white tracking-tighter animate-pulse">
                     {currentCountdown}
                   </span>
                 </div>
               </div>
-              <div className="mt-4 px-4 py-1.5 rounded-full bg-slate-900/80 border border-white/10 text-xs font-semibold text-orange-400">
+              <div className="mt-4 px-4 py-1.5 rounded-full bg-zinc-900/90 border border-white/10 text-xs font-semibold text-orange-400">
                 Get ready for Pose #{currentPoseIndex + 1}!
               </div>
             </div>
@@ -443,7 +437,7 @@ export default function CameraFeed({
 
           {/* 1.5s Pause & Notify Overlay between poses */}
           {sessionStatus === "capturing" && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/60 backdrop-blur-[2px]">
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-zinc-900/70 backdrop-blur-[2px]">
               <div className="absolute z-10 text-3xl font-serif italic text-gray-200 drop-shadow-lg text-center">
                 Captured...
               </div>
@@ -463,12 +457,12 @@ export default function CameraFeed({
             type="button"
             onClick={toggleFullscreen}
             title="Toggle Fullscreen"
-            className="absolute bottom-4 right-4 z-20 bg-white hover:bg-slate-100 text-slate-800 rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-slate-100"
+            className="absolute bottom-4 right-4 z-20 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl px-3 py-2 text-xs font-bold shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 border border-zinc-600"
           >
             {isFullscreen ? (
-              <Minimize2 className="w-4 h-4 text-slate-800" />
+              <Minimize2 className="w-4 h-4 text-white" />
             ) : (
-              <Maximize2 className="w-4 h-4 text-slate-800" />
+              <Maximize2 className="w-4 h-4 text-white" />
             )}
             <span>Fullscreen</span>
           </button>
@@ -478,11 +472,11 @@ export default function CameraFeed({
         {isComplete ? (
           /* AFTER CAPTURE (isComplete): Render 4 review buttons */
           <div className="w-full flex items-center justify-center gap-3 sm:gap-4 my-4 flex-wrap overflow-x-auto py-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* 1. Mirror: Off (White background, gray border/text) */}
+            {/* 1. Mirror: Off */}
             <button
               type="button"
               onClick={() => setIsMirrored((prev) => !prev)}
-              className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide shadow-sm active:scale-95"
+              className="bg-zinc-800 border border-zinc-600 text-white hover:bg-zinc-700 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide shadow-sm active:scale-95"
             >
               <span>Mirror: {isMirrored ? "On" : "Off"}</span>
             </button>
@@ -497,13 +491,13 @@ export default function CameraFeed({
               <span>Retake</span>
             </button>
 
-            {/* 3. DONE (White background, border-orange-500, text-orange-500) */}
+            {/* 3. DONE (bg-zinc-800, border-orange-500, text-orange-400) */}
             <button
               type="button"
               onClick={handleDone}
-              className="bg-white border-2 border-orange-500 text-orange-500 hover:bg-orange-50 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide shadow-sm flex items-center gap-2 active:scale-95"
+              className="bg-zinc-800 border-2 border-orange-500 text-orange-400 hover:bg-zinc-700 font-bold rounded-full px-6 py-3 transition-all cursor-pointer text-sm tracking-wide shadow-sm flex items-center gap-2 active:scale-95"
             >
-              <CheckCircle2 className="w-4 h-4 text-orange-500" />
+              <CheckCircle2 className="w-4 h-4 text-orange-400" />
               <span>DONE</span>
             </button>
 
@@ -561,12 +555,12 @@ export default function CameraFeed({
           return (
             <div
               key={idx}
-              className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 overflow-hidden flex-shrink-0 flex items-center justify-center bg-zinc-700/60 transition-all ${
+              className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 overflow-hidden flex-shrink-0 flex items-center justify-center bg-zinc-800/80 transition-all ${
                 captured
                   ? "border-orange-500 shadow-md shadow-orange-500/20"
                   : idx === currentPoseIndex && sessionStatus === "countdown"
                   ? "border-orange-500 animate-pulse"
-                  : "border-white/10"
+                  : "border-zinc-600"
               }`}
             >
               {captured ? (
@@ -577,7 +571,7 @@ export default function CameraFeed({
                 />
               ) : (
                 <div className="text-center p-1">
-                  <span className="text-[10px] font-bold text-neutral-500 block">
+                  <span className="text-[10px] font-bold text-zinc-400 block">
                     Pose #{idx + 1}
                   </span>
                 </div>

@@ -69,15 +69,15 @@ export default function PhotoboothStateMachine() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#cbd5e1] text-slate-900 flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-orange-500/30">
+    <div className="relative min-h-screen w-full bg-zinc-900 text-white flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-orange-500/30">
       {/* Main Container Layer */}
-      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center justify-center min-h-[85vh] p-4 sm:p-6 md:p-12 rounded-3xl bg-[#cbd5e1]">
+      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center justify-center min-h-[85vh] p-4 sm:p-6 md:p-12 rounded-3xl bg-zinc-700 border border-zinc-600/40 shadow-2xl">
         {/* Step Indicator Header */}
         {currentStep !== "start" && (
-          <div className="w-full flex items-center justify-between mb-4 px-4 py-3 rounded-full bg-slate-600/20 border border-slate-400/30 backdrop-blur-md transition-all duration-300">
+          <div className="w-full flex items-center justify-between mb-4 px-4 py-3 rounded-full bg-zinc-800/80 border border-zinc-600/50 backdrop-blur-md transition-all duration-300">
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 text-sm font-medium text-slate-800 hover:text-black transition-colors px-3 py-1.5 rounded-full hover:bg-black/5"
+              className="flex items-center gap-2 text-sm font-medium text-zinc-200 hover:text-white transition-colors px-3 py-1.5 rounded-full hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4" />
               {currentStep === "preview"
