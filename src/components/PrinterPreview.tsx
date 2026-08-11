@@ -5,8 +5,6 @@ import { motion } from "framer-motion";
 import {
   Download,
   Share2,
-  Film,
-  FileImage,
   RotateCcw,
   Loader2,
 } from "lucide-react";
@@ -264,27 +262,6 @@ export default function PrinterPreview({
           )}
           <span>Download PNG</span>
         </button>
-
-        {/* Save GIF & Save Video */}
-        <div className="flex items-center gap-3 w-full">
-          <button
-            type="button"
-            onClick={handleDownloadPNG}
-            className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
-          >
-            <FileImage className="w-4 h-4 text-orange-500" />
-            <span>Save GIF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleDownloadPNG}
-            className="bg-white hover:bg-slate-100 active:scale-98 text-gray-800 font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all text-sm"
-          >
-            <Film className="w-4 h-4 text-orange-500" />
-            <span>Save Video</span>
-          </button>
-        </div>
 
         {/* Share */}
         <button
