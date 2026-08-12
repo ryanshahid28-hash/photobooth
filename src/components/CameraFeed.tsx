@@ -264,6 +264,7 @@ export default function CameraFeed({
     setCurrentCountdown(null);
     setCurrentPoseIndex(0);
     setIsFlashing(false);
+    setIsMirrored(false);
   };
 
   // DONE Button Handler: Triggers parent state change (setCurrentStep('preview'))
