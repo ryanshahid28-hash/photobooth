@@ -69,12 +69,24 @@ export default function PrinterPreview({
       });
     };
 
-    // Load background pattern asset before starting canvas rendering
+    // Load background pattern and watermark logo assets concurrently before canvas rendering
     let bgPattern: HTMLImageElement | null = null;
+    let logoImg: HTMLImageElement | null = null;
     try {
-      bgPattern = await loadImage("/assets/orange-waves.png");
+      const [bg, logo] = await Promise.all([
+        loadImage("/assets/orange-waves.png").catch((err) => {
+          console.error("Error loading background pattern:", err);
+          return null;
+        }),
+        loadImage("/assets/little-arabia-logo.png").catch((err) => {
+          console.error("Error loading watermark logo:", err);
+          return null;
+        }),
+      ]);
+      bgPattern = bg;
+      logoImg = logo;
     } catch (err) {
-      console.error("Error loading background pattern asset:", err);
+      console.error("Error loading canvas assets:", err);
     }
 
     // Base Layer: Draw dynamic wavy background pattern across full canvas
@@ -122,6 +134,15 @@ export default function PrinterPreview({
       } catch (err) {
         console.error("Error drawing photo onto canvas:", err);
       }
+    }
+
+    // Watermark Logo Layer: Draw custom watermark logo in bottom-right corner above text pill
+    if (logoImg) {
+      const logoWidth = 80;
+      const logoHeight = 80;
+      const logoX = canvasWidth - logoWidth - 20;
+      const logoY = canvasHeight - logoHeight - 80;
+      ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
     }
 
     // Footer Layer: Retain text and ensure legibility with semi-transparent dark pill
