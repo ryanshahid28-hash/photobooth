@@ -53,7 +53,7 @@ export default function CameraFeed({
   }, [propLayout]);
 
   // Controls States
-  const [isMirrored, setIsMirrored] = useState<boolean>(false);
+  const [isMirrored, setIsMirrored] = useState<boolean>(true);
   const [isFlashOn, setIsFlashOn] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
@@ -264,7 +264,7 @@ export default function CameraFeed({
     setCurrentCountdown(null);
     setCurrentPoseIndex(0);
     setIsFlashing(false);
-    setIsMirrored(false);
+    setIsMirrored(true);
   };
 
   // DONE Button Handler: Triggers parent state change (setCurrentStep('preview'))
