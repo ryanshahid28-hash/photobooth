@@ -69,6 +69,23 @@ export default function PrinterPreview({
       });
     };
 
+    // Load background pattern asset before starting canvas rendering
+    let bgPattern: HTMLImageElement | null = null;
+    try {
+      bgPattern = await loadImage("/assets/orange-waves.png");
+    } catch (err) {
+      console.error("Error loading background pattern asset:", err);
+    }
+
+    // Base Layer: Draw dynamic wavy background pattern across full canvas
+    if (bgPattern) {
+      ctx.drawImage(bgPattern, 0, 0, canvasWidth, canvasHeight);
+    } else {
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
+
+    // Photo Layer: Stamp center-cropped photos over pattern with dark borders
     for (let i = 0; i < count; i++) {
       try {
         const img = await loadImage(capturedImages[i]);
@@ -98,22 +115,17 @@ export default function PrinterPreview({
 
         ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWidth, photoHeight);
 
-        ctx.strokeStyle = "#E5E5E5";
-        ctx.lineWidth = 2;
+        // Thin dark stroke to separate photos from the busy background pattern
+        ctx.strokeStyle = "#111111";
+        ctx.lineWidth = 4;
         ctx.strokeRect(x, y, photoWidth, photoHeight);
       } catch (err) {
         console.error("Error drawing photo onto canvas:", err);
       }
     }
 
+    // Footer Layer: Retain text and ensure legibility with semi-transparent dark pill
     const footerY = canvasHeight - footerHeight;
-
-    ctx.strokeStyle = "#F97316";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(padding, footerY + 15);
-    ctx.lineTo(canvasWidth - padding, footerY + 15);
-    ctx.stroke();
 
     const now = new Date();
     const formattedDate =
@@ -128,9 +140,32 @@ export default function PrinterPreview({
         minute: "2-digit",
       });
 
-    ctx.fillStyle = "#6B7280";
-    ctx.font = "14px sans-serif";
-    ctx.fillText(`PHOTOBOOTH MEMORY • ${formattedDate}`, canvasWidth / 2, footerY + 90);
+    const footerText = `PHOTOBOOTH MEMORY • ${formattedDate}`;
+
+    ctx.font = "bold 14px sans-serif";
+    const textMetrics = ctx.measureText(footerText);
+    const pillPaddingX = 24;
+    const pillHeight = 38;
+    const pillWidth = textMetrics.width + pillPaddingX * 2;
+    const pillX = (canvasWidth - pillWidth) / 2;
+    const pillY = footerY + (footerHeight - pillHeight) / 2;
+    const pillRadius = pillHeight / 2;
+
+    // Subtle semi-transparent dark pill background
+    ctx.fillStyle = "rgba(17, 17, 17, 0.75)";
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillRadius);
+    } else {
+      ctx.rect(pillX, pillY, pillWidth, pillHeight);
+    }
+    ctx.fill();
+
+    // Legible white date text inside pill
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(footerText, canvasWidth / 2, pillY + pillHeight / 2);
 
     return canvas;
   }, [capturedImages]);
