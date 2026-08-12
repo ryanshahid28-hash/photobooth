@@ -194,10 +194,33 @@ export default function CameraFeed({
   };
 
   // Flash & Take Snapshot Logic
-  const capturePhoto = (poseIndex: number) => {
+  const capturePhoto = async (poseIndex: number) => {
+    let videoTrack: MediaStreamTrack | null = null;
+
     if (isFlashOn) {
       setIsFlashing(true);
-      setTimeout(() => setIsFlashing(false), 250);
+
+      // Attempt hardware torch activation if supported on camera track
+      try {
+        const stream = webcamRef.current?.video?.srcObject as MediaStream | null;
+        if (stream) {
+          const tracks = stream.getVideoTracks();
+          if (tracks.length > 0) {
+            videoTrack = tracks[0];
+            const capabilities = (videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}) as { torch?: boolean };
+            if (capabilities && capabilities.torch) {
+              await videoTrack.applyConstraints({
+                advanced: [{ torch: true } as unknown as MediaTrackConstraintSet],
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Hardware torch unavailable or rejected:", err);
+      }
+
+      // Wait 250ms with full-screen white flash & torch active to illuminate subject in dark room
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -210,6 +233,22 @@ export default function CameraFeed({
     };
 
     setCapturedPhotos((prev) => [...prev, newPhoto]);
+
+    if (isFlashOn) {
+      // Hold flash effect for an additional 150ms for visual feedback
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      setIsFlashing(false);
+
+      if (videoTrack) {
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ torch: false } as unknown as MediaTrackConstraintSet],
+          });
+        } catch (err) {
+          // ignore
+        }
+      }
+    }
   };
 
   // Start Interval Capture Sequence
@@ -227,7 +266,7 @@ export default function CameraFeed({
 
     if (activeIntervalRef.current) clearInterval(activeIntervalRef.current);
 
-    activeIntervalRef.current = setInterval(() => {
+    activeIntervalRef.current = setInterval(async () => {
       timeLeft -= 1;
       if (timeLeft > 0) {
         setCurrentCountdown(timeLeft);
@@ -235,7 +274,7 @@ export default function CameraFeed({
         if (activeIntervalRef.current) clearInterval(activeIntervalRef.current);
         setCurrentCountdown(0);
 
-        capturePhoto(poseIndex);
+        await capturePhoto(poseIndex);
 
         const nextPose = poseIndex + 1;
         if (nextPose < selectedLayout.poseCount) {
@@ -370,9 +409,9 @@ export default function CameraFeed({
           ref={containerRef}
           className="relative w-full max-w-3xl aspect-[4/3] bg-zinc-900 overflow-hidden rounded-3xl border border-zinc-600/50 shadow-2xl flex items-center justify-center group"
         >
-          {/* White Flash Effect Overlay */}
+          {/* Full-screen White Flash Light Effect Overlay */}
           <div
-            className={`absolute inset-0 bg-white z-40 pointer-events-none transition-opacity duration-150 ${
+            className={`fixed inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-100 ${
               isFlashing ? "opacity-100" : "opacity-0"
             }`}
           />
@@ -487,7 +526,11 @@ export default function CameraFeed({
                   <button
                     type="button"
                     onClick={() => setIsFlashOn((prev) => !prev)}
-                    className="bg-zinc-800 border border-zinc-600 text-white hover:bg-zinc-700 font-bold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
+                    className={`border text-white font-bold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95 ${
+                      isFlashOn
+                        ? "bg-orange-500 border-orange-400"
+                        : "bg-zinc-800 border-zinc-600 text-zinc-300"
+                    }`}
                   >
                     <span>Flash: {isFlashOn ? "On" : "Off"}</span>
                   </button>
@@ -520,7 +563,11 @@ export default function CameraFeed({
                   <button
                     type="button"
                     onClick={() => setIsFlashOn((prev) => !prev)}
-                    className="bg-zinc-800/90 border border-zinc-600 text-white hover:bg-zinc-700 font-semibold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
+                    className={`border text-white font-semibold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95 ${
+                      isFlashOn
+                        ? "bg-orange-500 border-orange-400"
+                        : "bg-zinc-800 border-zinc-600 text-zinc-300"
+                    }`}
                   >
                     <span>Flash: {isFlashOn ? "On" : "Off"}</span>
                   </button>
@@ -578,11 +625,15 @@ export default function CameraFeed({
               <span>DONE</span>
             </button>
 
-            {/* 4. Flash: On (Solid bg-orange-500, white text) */}
+            {/* 4. Flash: On/Off */}
             <button
               type="button"
               onClick={() => setIsFlashOn((prev) => !prev)}
-              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg shadow-orange-500/20 text-sm tracking-wide"
+              className={`font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg text-sm tracking-wide active:scale-95 ${
+                isFlashOn
+                  ? "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20"
+                  : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-600"
+              }`}
             >
               <span>Flash: {isFlashOn ? "On" : "Off"}</span>
             </button>
@@ -616,7 +667,11 @@ export default function CameraFeed({
             <button
               type="button"
               onClick={() => setIsFlashOn((prev) => !prev)}
-              className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-bold rounded-full px-6 py-3 shadow-lg shadow-orange-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer text-sm tracking-wide"
+              className={`font-bold rounded-full px-6 py-3 transition-all cursor-pointer shadow-lg text-sm tracking-wide flex items-center justify-center gap-2 active:scale-95 ${
+                isFlashOn
+                  ? "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/25"
+                  : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-600"
+              }`}
             >
               <span>Flash: {isFlashOn ? "On" : "Off"}</span>
             </button>
