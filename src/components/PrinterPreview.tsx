@@ -51,7 +51,7 @@ export default function PrinterPreview({
     const photoWidth = canvasWidth - padding * 2;
     const targetAspectRatio = 3 / 4;
     const photoHeight = Math.round(photoWidth / targetAspectRatio);
-    const footerHeight = 130;
+    const footerHeight = 160;
     const canvasHeight = padding + count * (photoHeight + padding) + footerHeight;
 
     canvas.width = canvasWidth;
@@ -136,16 +136,7 @@ export default function PrinterPreview({
       }
     }
 
-    // Watermark Logo Layer: Draw custom watermark logo in bottom-right corner above text pill
-    if (logoImg) {
-      const logoWidth = 80;
-      const logoHeight = 80;
-      const logoX = canvasWidth - logoWidth - 20;
-      const logoY = canvasHeight - logoHeight - 80;
-      ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-    }
-
-    // Footer Layer: Retain text and ensure legibility with semi-transparent dark pill
+    // Footer Layer Setup
     const footerY = canvasHeight - footerHeight;
 
     const now = new Date();
@@ -169,10 +160,19 @@ export default function PrinterPreview({
     const pillHeight = 38;
     const pillWidth = textMetrics.width + pillPaddingX * 2;
     const pillX = (canvasWidth - pillWidth) / 2;
-    const pillY = footerY + (footerHeight - pillHeight) / 2;
+    const pillY = canvasHeight - pillHeight - 20;
     const pillRadius = pillHeight / 2;
 
-    // Subtle semi-transparent dark pill background
+    // Brand Logo Layer: Centered horizontally, positioned directly above the date pill
+    if (logoImg) {
+      const logoWidth = 80;
+      const logoHeight = 80;
+      const logoX = (canvasWidth / 2) - (logoWidth / 2);
+      const logoY = pillY - logoHeight - 10;
+      ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+    }
+
+    // Date Pill & Text Layer: Rendered on top of logo/background for crisp legibility
     ctx.fillStyle = "rgba(17, 17, 17, 0.75)";
     ctx.beginPath();
     if (typeof ctx.roundRect === "function") {
