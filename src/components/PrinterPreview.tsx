@@ -69,24 +69,18 @@ export default function PrinterPreview({
       });
     };
 
-    // Load background pattern and watermark logo assets concurrently before canvas rendering
+    // Load background pattern and logo assets before canvas rendering
     let bgPattern: HTMLImageElement | null = null;
     let logoImg: HTMLImageElement | null = null;
     try {
-      const [bg, logo] = await Promise.all([
-        loadImage("/assets/orange-waves.png").catch((err) => {
-          console.error("Error loading background pattern:", err);
-          return null;
-        }),
-        loadImage("/assets/little-arabia-logo.png").catch((err) => {
-          console.error("Error loading watermark logo:", err);
-          return null;
-        }),
-      ]);
-      bgPattern = bg;
-      logoImg = logo;
+      bgPattern = await loadImage("/assets/orange-waves.png");
     } catch (err) {
-      console.error("Error loading canvas assets:", err);
+      console.error("Error loading background pattern:", err);
+    }
+    try {
+      logoImg = await loadImage("/assets/little-arabia-logo.png");
+    } catch (err) {
+      console.error("Error loading logo image:", err);
     }
 
     // Base Layer: Draw dynamic wavy background pattern across full canvas
@@ -139,6 +133,25 @@ export default function PrinterPreview({
     // Footer Layer Setup
     const footerY = canvasHeight - footerHeight;
 
+    let logoOffsetY = 12;
+    if (logoImg) {
+      const maxLogoWidth = 240;
+      const maxLogoHeight = 65;
+      const logoAspect =
+        (logoImg.naturalWidth || logoImg.width) /
+        (logoImg.naturalHeight || logoImg.height);
+      let drawW = maxLogoWidth;
+      let drawH = maxLogoWidth / logoAspect;
+      if (drawH > maxLogoHeight) {
+        drawH = maxLogoHeight;
+        drawW = maxLogoHeight * logoAspect;
+      }
+      const logoX = (canvasWidth - drawW) / 2;
+      const logoY = footerY + 12;
+      ctx.drawImage(logoImg, logoX, logoY, drawW, drawH);
+      logoOffsetY = 12 + drawH + 10;
+    }
+
     const now = new Date();
     const formattedDate =
       now.toLocaleDateString("en-US", {
@@ -154,25 +167,18 @@ export default function PrinterPreview({
 
     const footerText = `PHOTOBOOTH MEMORY • ${formattedDate}`;
 
-    ctx.font = "bold 14px sans-serif";
+    ctx.font = "bold 13px sans-serif";
     const textMetrics = ctx.measureText(footerText);
-    const pillPaddingX = 24;
-    const pillHeight = 38;
+    const pillPaddingX = 20;
+    const pillHeight = 34;
     const pillWidth = textMetrics.width + pillPaddingX * 2;
     const pillX = (canvasWidth - pillWidth) / 2;
-    const pillY = canvasHeight - pillHeight - 20;
+    const pillY = logoImg
+      ? footerY + logoOffsetY
+      : footerY + (footerHeight - pillHeight) / 2;
     const pillRadius = pillHeight / 2;
 
-    // Brand Logo Layer: Centered horizontally, positioned directly above the date pill
-    if (logoImg) {
-      const logoWidth = 80;
-      const logoHeight = 80;
-      const logoX = (canvasWidth / 2) - (logoWidth / 2);
-      const logoY = pillY - logoHeight - 10;
-      ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-    }
-
-    // Date Pill & Text Layer: Rendered on top of logo/background for crisp legibility
+    // Date Pill & Text Layer: Rendered on top of background for crisp legibility
     ctx.fillStyle = "rgba(17, 17, 17, 0.75)";
     ctx.beginPath();
     if (typeof ctx.roundRect === "function") {

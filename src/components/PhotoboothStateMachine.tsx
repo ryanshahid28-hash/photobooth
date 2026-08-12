@@ -89,15 +89,22 @@ export default function PhotoboothStateMachine() {
                 ? "Back to Layouts"
                 : "Back to Home"}
             </button>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-400">
-              <Sparkles className="w-4 h-4" />
-              <span>
-                {currentStep === "layout"
-                  ? "Step 1 of 3 • Select Layout"
-                  : currentStep === "camera"
-                  ? "Step 2 of 3 • Camera View"
-                  : "Step 3 of 3 • Final Preview"}
-              </span>
+            <div className="flex items-center gap-4">
+              <img
+                src="/assets/little-arabia-logo.png"
+                alt="Brand Logo"
+                className="h-7 w-auto object-contain hidden sm:block drop-shadow-sm"
+              />
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-400">
+                <Sparkles className="w-4 h-4" />
+                <span>
+                  {currentStep === "layout"
+                    ? "Step 1 of 3 • Select Layout"
+                    : currentStep === "camera"
+                    ? "Step 2 of 3 • Camera View"
+                    : "Step 3 of 3 • Final Preview"}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -105,6 +112,12 @@ export default function PhotoboothStateMachine() {
         {/* SCREEN 1: START SCREEN */}
         {currentStep === "start" && (
           <div className="w-full flex flex-col items-center justify-center text-center py-12 px-6 animate-in fade-in zoom-in-95 duration-300">
+            <img
+              src="/assets/little-arabia-logo.png"
+              alt="Brand Logo"
+              className="h-20 sm:h-28 w-auto object-contain mb-8 filter drop-shadow-lg animate-pulse-subtle"
+            />
+
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-white text-sm font-semibold tracking-wide mb-6">
               <Sparkles className="w-4 h-4 text-orange-400" />
               <span>Digital Photobooth</span>
