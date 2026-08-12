@@ -93,7 +93,7 @@ export default function PhotoboothStateMachine() {
               <img
                 src="/assets/little-arabia-logo.png"
                 alt="Brand Logo"
-                className="h-10 sm:h-12 w-auto object-contain hidden sm:block drop-shadow-sm"
+                className="h-12 sm:h-16 w-auto object-contain hidden sm:block drop-shadow-sm"
               />
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange-400">
                 <Sparkles className="w-4 h-4" />
@@ -115,7 +115,7 @@ export default function PhotoboothStateMachine() {
             <img
               src="/assets/little-arabia-logo.png"
               alt="Brand Logo"
-              className="h-32 sm:h-44 w-auto object-contain mb-8 filter drop-shadow-lg animate-pulse-subtle"
+              className="h-44 sm:h-60 w-auto object-contain mb-8 filter drop-shadow-lg animate-pulse-subtle"
             />
 
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-white text-sm font-semibold tracking-wide mb-6">

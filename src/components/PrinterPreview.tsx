@@ -51,7 +51,7 @@ export default function PrinterPreview({
     const photoWidth = canvasWidth - padding * 2;
     const targetAspectRatio = 3 / 4;
     const photoHeight = Math.round(photoWidth / targetAspectRatio);
-    const footerHeight = 200;
+    const footerHeight = 270;
     const canvasHeight = padding + count * (photoHeight + padding) + footerHeight;
 
     canvas.width = canvasWidth;
@@ -137,10 +137,10 @@ export default function PrinterPreview({
     // Footer Layer Setup
     const footerY = canvasHeight - footerHeight;
 
-    let logoOffsetY = 14;
+    let logoOffsetY = 16;
     if (logoImg) {
-      const maxLogoWidth = 360;
-      const maxLogoHeight = 100;
+      const maxLogoWidth = 460;
+      const maxLogoHeight = 180;
       const logoAspect =
         (logoImg.naturalWidth || logoImg.width) /
         (logoImg.naturalHeight || logoImg.height);
@@ -151,14 +151,14 @@ export default function PrinterPreview({
         drawW = maxLogoHeight * logoAspect;
       }
       const logoX = (canvasWidth - drawW) / 2;
-      const logoY = footerY + 14;
+      const logoY = footerY + 16;
 
       // Force canvas to render logo at high quality smoothing to eliminate pixelation
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
       ctx.drawImage(logoImg, logoX, logoY, drawW, drawH);
-      logoOffsetY = 14 + drawH + 12;
+      logoOffsetY = 16 + drawH + 14;
     }
 
     const now = new Date();
