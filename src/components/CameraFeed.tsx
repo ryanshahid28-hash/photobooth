@@ -453,6 +453,88 @@ export default function CameraFeed({
             </div>
           )}
 
+          {/* FLOATING IN-VIEWPORT OVERLAY CONTROLS (Always accessible in Fullscreen mode) */}
+          {(sessionStatus === "idle" || sessionStatus === "completed" || isComplete || isFullscreen) && (
+            <div
+              className={`absolute z-30 flex items-center justify-center gap-2.5 sm:gap-3 backdrop-blur-md px-4 py-2.5 rounded-full border shadow-2xl transition-all duration-300 ${
+                isFullscreen
+                  ? "bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/90 border-white/20 scale-110"
+                  : "bottom-4 left-1/2 -translate-x-1/2 bg-zinc-900/80 border-white/15"
+              }`}
+            >
+              {isComplete ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsMirrored((prev) => !prev)}
+                    className="bg-zinc-800 border border-zinc-600 text-white hover:bg-zinc-700 font-bold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRetake}
+                    className="bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-extrabold rounded-full px-4 py-1.5 text-xs tracking-wider shadow-lg shadow-orange-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>RETAKE</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDone}
+                    className="bg-zinc-800 border-2 border-orange-500 text-orange-400 hover:bg-zinc-700 active:scale-95 font-extrabold rounded-full px-4 py-1.5 text-xs tracking-wider shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-orange-400" />
+                    <span>DONE</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFlashOn((prev) => !prev)}
+                    className="bg-zinc-800 border border-zinc-600 text-white hover:bg-zinc-700 font-bold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <span>Flash: {isFlashOn ? "On" : "Off"}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsMirrored((prev) => !prev)}
+                    className="bg-zinc-800/90 border border-zinc-600 text-white hover:bg-zinc-700 font-semibold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <span>Mirror: {isMirrored ? "On" : "Off"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={startSequence}
+                    disabled={
+                      !isCameraReady ||
+                      hasError ||
+                      sessionStatus === "countdown" ||
+                      sessionStatus === "capturing"
+                    }
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 active:scale-95 text-white font-black text-xs sm:text-sm tracking-widest rounded-full px-6 py-2 shadow-xl shadow-orange-500/40 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>START</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFlashOn((prev) => !prev)}
+                    className="bg-zinc-800/90 border border-zinc-600 text-white hover:bg-zinc-700 font-semibold rounded-full px-3 py-1.5 text-xs transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <span>Flash: {isFlashOn ? "On" : "Off"}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* FLOATING FULLSCREEN OVERLAY BUTTON (Bottom Right Corner) */}
           <button
             type="button"
