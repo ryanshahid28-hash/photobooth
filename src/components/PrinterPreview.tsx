@@ -69,18 +69,22 @@ export default function PrinterPreview({
       });
     };
 
-    // Load background pattern and logo assets before canvas rendering
+    // Load static canvas assets in initial loading queue
     let bgPattern: HTMLImageElement | null = null;
     let logoImg: HTMLImageElement | null = null;
+    let stickerImg: HTMLImageElement | null = null;
+
     try {
-      bgPattern = await loadImage("/assets/orange-waves.png");
+      const [bgRes, logoRes, stickerRes] = await Promise.allSettled([
+        loadImage("/assets/orange-waves.png"),
+        loadImage("/assets/little-arabia-logo.png"),
+        loadImage("/assets/peeling-sticker.png"),
+      ]);
+      if (bgRes.status === "fulfilled") bgPattern = bgRes.value;
+      if (logoRes.status === "fulfilled") logoImg = logoRes.value;
+      if (stickerRes.status === "fulfilled") stickerImg = stickerRes.value;
     } catch (err) {
-      console.error("Error loading background pattern:", err);
-    }
-    try {
-      logoImg = await loadImage("/assets/little-arabia-logo.png");
-    } catch (err) {
-      console.error("Error loading logo image:", err);
+      console.error("Error loading canvas assets:", err);
     }
 
     // Base Layer: Draw dynamic wavy background pattern across full canvas
@@ -148,6 +152,11 @@ export default function PrinterPreview({
       }
       const logoX = (canvasWidth - drawW) / 2;
       const logoY = footerY + 12;
+
+      // Force canvas to render logo at high quality smoothing to eliminate pixelation
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
       ctx.drawImage(logoImg, logoX, logoY, drawW, drawH);
       logoOffsetY = 12 + drawH + 10;
     }
@@ -193,6 +202,19 @@ export default function PrinterPreview({
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(footerText, canvasWidth / 2, pillY + pillHeight / 2);
+
+    // Topmost Layer: Overlay peeling sticker on the top right edge
+    if (stickerImg) {
+      const stickerWidth = 120;
+      const stickerHeight = 120;
+      const margin = 10;
+      const stickerX = canvasWidth - stickerWidth - margin;
+      const stickerY = margin;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(stickerImg, stickerX, stickerY, stickerWidth, stickerHeight);
+    }
 
     return canvas;
   }, [capturedImages]);
