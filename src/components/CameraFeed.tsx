@@ -453,15 +453,9 @@ export default function CameraFeed({
             </div>
           )}
 
-          {/* FLOATING IN-VIEWPORT OVERLAY CONTROLS (Always accessible in Fullscreen mode) */}
-          {(sessionStatus === "idle" || sessionStatus === "completed" || isComplete || isFullscreen) && (
-            <div
-              className={`absolute z-30 flex items-center justify-center gap-2.5 sm:gap-3 backdrop-blur-md px-4 py-2.5 rounded-full border shadow-2xl transition-all duration-300 ${
-                isFullscreen
-                  ? "bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900/90 border-white/20 scale-110"
-                  : "bottom-4 left-1/2 -translate-x-1/2 bg-zinc-900/80 border-white/15"
-              }`}
-            >
+          {/* FLOATING IN-VIEWPORT OVERLAY CONTROLS (Only visible in Fullscreen mode) */}
+          {isFullscreen && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center justify-center gap-2.5 sm:gap-3 backdrop-blur-md px-5 py-3 rounded-full border border-white/20 bg-zinc-900/90 shadow-2xl transition-all duration-300 scale-110">
               {isComplete ? (
                 <>
                   <button
